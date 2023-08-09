@@ -2,8 +2,7 @@ from django.db import models
 
 # Create your models here.
 class Usuario(models.Model):
-    cod_user = models.TextField(verbose_name='Codigo')
-    #cod_user = models.TextField(max_length=15)
+    cod_user = models.TextField(verbose_name='Codigo', unique=True)
     nombre = models.TextField(verbose_name='Nombre')
     apellido = models.TextField(verbose_name='Apellido')
     correo = models.TextField(verbose_name='Correo')
@@ -21,8 +20,7 @@ class Usuario(models.Model):
     
 
 class Activos(models.Model):
-    cod_activo = models.TextField(verbose_name='Cod Activo')
-    #cod_activo = models.TextField(max_length=15)
+    cod_activo = models.IntegerField(verbose_name=("Codigo Activo"), primary_key=True, max_length=5)
     descripcion = models.TextField(verbose_name='Descripcion')
     valor_costo = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Costo')
     valor_venta = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Venta')
@@ -56,7 +54,7 @@ class Activos(models.Model):
 
 class Clientes(models.Model):
     nombre = models.TextField(verbose_name="Nombre")
-    cedula = models.TextField(verbose_name="Cedula")
+    cedula = models.TextField(verbose_name="Cedula", unique=True, null=True)
     telefono = models.TextField(verbose_name="Telefono")
     correo = models.TextField(verbose_name="correo")
     direccion = models.TextField(verbose_name="Direccion")
@@ -74,7 +72,7 @@ class Clientes(models.Model):
 class Doctores(models.Model):
     nombre = models.TextField( verbose_name="Nombre")
     telefono = models.TextField( verbose_name="Telefono")
-    cedula = models.TextField( verbose_name="cedula")
+    cedula = models.TextField( verbose_name="cedula", unique=True, null=True)
     direccion = models.TextField( verbose_name="direccion")
     ciudad = models.TextField( verbose_name="Ciudad")
     cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.PROTECT)
@@ -88,8 +86,7 @@ class Doctores(models.Model):
         ordering: ['Nombre'] 
 
 class Formulas(models.Model):
-    cod_formula = models.TextField(verbose_name=("Codigo Formula"))
-    #cod_formula = models.TextField(max_length=15)
+    cod_formula = models.TextField(verbose_name=("Codigo Formula"),unique=True)
     nombre = models.TextField(verbose_name=("Nombre Formula"))
     comp_activos = models.TextField(verbose_name=("Composicion"))
     cantidad = models.IntegerField(verbose_name=("Cantidad"))
@@ -108,8 +105,6 @@ class Formulas(models.Model):
         ordering: ['cod_formula']
 
 class Pedidos(models. Model):
-    cod_pedido = models.TextField(verbose_name=("Codigo Pedido"))
-    #cod_pedido = models.TextField(max_length=15)
     descripcion = models.TextField(verbose_name=("Descripcion"))
     fecha = models.DateTimeField(verbose_name=("Fecha"), auto_now_add=True)
     estado = models.TextField(verbose_name=("Estado"))
@@ -131,7 +126,7 @@ class Pedidos(models. Model):
 
 class Visitas(models.Model):
     nombre = models.TextField(verbose_name=("Nombre"))
-    cedula = models.TextField(verbose_name=("Cedula"))
+    cedula = models.TextField(verbose_name=("Cedula"),unique=True, null=True)
     telefono = models.TextField(verbose_name=("Telefono"))
     correo = models.TextField(verbose_name=("Correo"))
     direccion = models.TextField(verbose_name=("Direccion"))
