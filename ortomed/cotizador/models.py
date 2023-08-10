@@ -19,8 +19,8 @@ class Usuario(models.Model):
         ordering: ['cod_user']
     
 
-class Activos(models.Model):
-    cod_activo = models.IntegerField(verbose_name=("Codigo Activo"), primary_key=True, max_length=5)
+class Inventario(models.Model):
+    cod_inven = models.IntegerField(verbose_name=("Codigo Inventario"), primary_key=True, max_length=5)
     descripcion = models.TextField(verbose_name='Descripcion')
     valor_costo = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Costo')
     valor_venta = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Venta')
@@ -47,9 +47,9 @@ class Activos(models.Model):
         return selfs.cod_activo
     
     class Meta:
-        verbose_name = 'Activo'
-        verbose_name_plural = 'Activos'
-        ordering: ['cod_activo']
+        verbose_name = 'Inventario'
+        verbose_name_plural = 'Inventarios'
+        ordering: ['cod_inven']
 
 
 class Clientes(models.Model):
