@@ -43,7 +43,7 @@ class Activos(models.Model):
     densidad = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='Densidad')
     tipo = models.TextField(verbose_name=("Tipo"))
 
-    def _str_(selfs):
+    def _str_(selfs):               #permite transformar los objetos a string
         return selfs.cod_activo
     
     class Meta:
