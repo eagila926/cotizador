@@ -1,0 +1,41 @@
+{% load bootstrap4 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+'{% load static %}'
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inventario</title>
+    <link rel="stylesheet" type="text/css" href={% static 'formula.css' %}>
+</head>
+<body>
+    <h1>Inventario</h1>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Codigo</th>
+                <th scope="col">Descripcion</th>
+                <th scope="col">Valor Costo</th>
+                <th scope="col">Valor Venta</th>
+                <th scope="col">Unidad de Compra</th>
+                <th scope="col">Stock</th>
+                <th scope="col">Stock Minimo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inventario in inventarios %}
+                <tr>
+                    <td>{{ inventario.cod_inven }}</td>
+                    <td>{{ inventario.descripcion }}</td>
+                    <td>{{ inventario.valor_costo }}</td>
+                    <td>{{ inventario.valor_venta }}</td>
+                    <td>{{ inventario.unidad_compra }}</td>
+                    <td>{{ inventario.stock }}</td>
+                    <td>{{ inventario.stock_min }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
