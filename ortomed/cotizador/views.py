@@ -1,6 +1,9 @@
 from django.http import HttpResponse
 from django.shortcuts import render
 
+from cotizador.models import Inventario
+from django.core.paginator import Paginator
+
 # Create your views here.
 def login(request):
     return render( request, 'login.html')
@@ -18,7 +21,14 @@ def facturas(request):
     return render(request, 'facturas.html')
 
 def formula(request):
-    return render(request, 'formula.html')
+
+    data = {
+        'inventarios': Inventario.objects.all(),
+        # 'paginator': Paginator('inventarios',10),
+        # 'page_number': request.GET.get('page'),
+        # 'page_obj': 'paginator'.get('page_number')
+    }
+    return render(request, 'formula.html', data)
 
 def inventario(request):
     return render(request, 'inventario.html')

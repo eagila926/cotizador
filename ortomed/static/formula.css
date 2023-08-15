@@ -1,0 +1,5 @@
+
+.table {
+    background: rgb(238,174,202);
+background: linear-gradient(90deg, rgba(238,174,202,1) 0%, rgba(255,255,255,1) 100%);
+}
