@@ -38,3 +38,6 @@ def pedidos(request):
 
 def reportes(request):
     return render(request, 'reportes.html')
+
+def home(request):
+    return render(request, 'home.html')

@@ -79,12 +79,12 @@ WSGI_APPLICATION = 'ortomed.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'ortomed',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': 'localhost',  # O el host donde se encuentra tu base de datos MySQL
-        'PORT': '3306'
+        'USER': 'postgres',
+        'PASSWORD': 'PG240819ea',
+        'HOST': 'localhost',
+        'PORT': '5433',
         }
 }
 

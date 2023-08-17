@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from cotizador.views import login, comercial, dashboard, etiquetas, facturas, formula, inventario, pedidos, reportes
+from cotizador.views import login, comercial, dashboard, etiquetas, facturas, formula, inventario, pedidos, reportes, home
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,5 +29,6 @@ urlpatterns = [
     path('formula/', formula),
     path('inventario/', inventario),
     path('pedidos/', pedidos),
-    path('reportes/', reportes)
+    path('reportes/', reportes),
+    path('home/', home)
 ]
