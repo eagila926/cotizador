@@ -20,7 +20,7 @@ class Usuario(models.Model):
     
 
 class Inventario(models.Model):
-    cod_inven = models.IntegerField(verbose_name=("Codigo Inventario"), primary_key=True, max_length=5)
+    cod_inven = models.IntegerField(verbose_name=("Codigo Inventario"), primary_key=True)
     descripcion = models.TextField(verbose_name='Descripcion')
     valor_costo = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Costo')
     valor_venta = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Venta')
@@ -140,3 +140,10 @@ class Visitas(models.Model):
         verbose_name = 'Visita'
         verbose_name_plural = 'Visitas'
         ordering: ['nombre']
+
+
+class DiccionarioDatos(models.Model):
+    datos = models.JSONField()  # Campo JSON para almacenar el diccionario
+
+    def __str__(self):
+        return f'Diccionario ID: {self.id}'
