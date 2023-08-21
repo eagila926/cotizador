@@ -140,10 +140,3 @@ class Visitas(models.Model):
         verbose_name = 'Visita'
         verbose_name_plural = 'Visitas'
         ordering: ['nombre']
-
-
-class DiccionarioDatos(models.Model):
-    datos = models.JSONField()  # Campo JSON para almacenar el diccionario
-
-    def __str__(self):
-        return f'Diccionario ID: {self.id}'
