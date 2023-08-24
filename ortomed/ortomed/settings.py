@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap4',
     #Mis Apps
-    'cotizador'
+    'cotizador',
 ]
 
 MIDDLEWARE = [
@@ -79,12 +79,12 @@ WSGI_APPLICATION = 'ortomed.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'ortomed',
         'USER': 'postgres',
         'PASSWORD': 'PG240819ea',
         'HOST': 'localhost',
-        'PORT': '5433',
+        'PORT': '5433'
         }
 }
 
