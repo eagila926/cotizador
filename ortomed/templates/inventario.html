@@ -1,3 +1,82 @@
 <!--Agregar la opcion de agregar activos con un modal-->
 
+{% extends "body.html" %}
+{%load static%}
+{% block head %}
+    <link rel="stylesheet" href="{% static 'lib/datatables-1.10.20/css/dataTables.bootstrap4.min.css' %}"/>
+    <link rel="stylesheet" href="{% static 'lib/datatables-1.10.20/plugins/responsive-2.2.3/css/responsive.bootstrap4.min.css' %}"/>
+    <script src="{% static 'lib/datatables-1.10.20/js/jquery.dataTables.js' %}"></script>
+    <script src="{% static 'lib/datatables-1.10.20/js/dataTables.bootstrap4.min.js' %}"></script>
+    <script src="{% static 'lib/datatables-1.10.20/plugins/responsive-2.2.3/js/dataTables.responsive.min.js' %}"></script>
+    <script src="{% static 'lib/datatables-1.10.20/plugins/responsive-2.2.3/js/responsive.bootstrap4.min.js' %}"></script>
+
+{% endblock head %}
+
+{% block content %}
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-list-alt"></i>
+                {{title}}
+            </h3>
+        </div>
+        <div class="card-body">
+            <table class="table" id="data">
+                <thead>
+                    <tr>
+                        <th scope="col" >Código</th>
+                        <th scope="col" >Activo</th>
+                        <th scope="col" >Valor costo</th>
+                        <th scope="col" >Valor venta</th>
+                        <th scope="col" >Unidad de Compra</th>
+                        <th scope="col" >Stock</th>
+                        <th scope="col" >Stock min</th>
+                        <th scope="col" >Acciones</th>
+
+                    </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    {% for inv in object_list%}
+                        <tr>
+                            <td>{{ inv.cod_inven }}</td>
+                            <td>{{ inv.descripcion }}</td>
+                            <td>{{ inv.valor_costo }}</td>
+                            <td>{{ inv.valor_venta }}</td>
+                            <td>{{ inv.unidad_compra }}</td>
+                            <td>{{ inv.stock }}</td>
+                            <td>{{ inv.stock_min }}</td>
+                            <td>
+                                <button type="button" class="btn btn-success btn-xs btn-flat">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-danger btn-xs btn-flat">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-primary btn-flat">
+                <i class="fas fa-plus"></i> Nuevo registro
+            </button>
+        </div>
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    <script type="application/javascript">
+        $(function () {
+            $(#data).DataTable({
+                responsive: true,
+                autoWidth: false
+            });
+        });
+    </script>
+{% endblock %}
 
