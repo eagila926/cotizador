@@ -1,43 +1,22 @@
+from typing import Any, Dict
+from django.views.generic import ListView, CreateView, UpdateView
 from django.http import HttpResponse
 from django.shortcuts import render
 
-from cotizador.models import Inventario
-from django.core.paginator import Paginator
+from .models import Inventario
+
 
 # Create your views here.
 def login(request):
     return render( request, 'login.html')
 
-def comercial(request):
-    return render( request, 'comercial.html')
+class InventarioListView (ListView):
+    model = Inventario
+    template_name = 'inventario.html'
 
-def dashboard(request):
-    return render( request, 'dashboard.html')
-
-def etiquetas(request):
-    return render(request, 'etiquetas.html')
-
-def facturas(request):
-    return render(request, 'facturas.html')
-
-def formula(request):
-
-    data = {
-        'inventarios': Inventario.objects.all(),
-        # 'paginator': Paginator('inventarios',10),
-        # 'page_number': request.GET.get('page'),
-        # 'page_obj': 'paginator'.get('page_number')
-    }
-    return render(request, 'formula.html', data)
-
-def inventario(request):
-    return render(request, 'inventario.html')
-
-def pedidos(request):
-    return render(request, 'pedidos.html')
-
-def reportes(request):
-    return render(request, 'reportes.html')
-
-def home(request):
-    return render(request, 'home.html')
+    def get_context_data(self, **kwargs):
+        context =super().get_context_data(**kwargs)
+        context['title'] = 'Inventario'
+        
+        return context
+    

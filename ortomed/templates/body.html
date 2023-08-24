@@ -1,0 +1,21 @@
+{% extends "home.html" %}
+{% block body %}
+    <body>
+    <!-incluimos el header-->
+    {% include "header.html" %}
+    
+    <!-Bloque para contenido-->
+     <div class="content">
+                <div class="container">
+                    {% block content %}
+
+                    {% endblock %}
+                </div>
+    </div>
+    <!-Bloque para javascript-->
+    {% block javascript %}
+
+    {% endblock %}
+
+
+{% endblock body %}
