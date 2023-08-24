@@ -19,4 +19,3 @@ class InventarioListView (ListView):
         context['title'] = 'Inventario'
         
         return context
-    
