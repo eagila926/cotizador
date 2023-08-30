@@ -5,10 +5,9 @@ class InventarioForm(ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # for form in self.visible_fields():
-        #     form.field.widget.attrs['class'] = 'form-control'
-        #     form.field.widget.attrs['autocomplete'] = 'off'
+        
         self.fields['cod_inven'].widget.attrs['autofocus'] = True
+
         
     class Meta:
         model = Inventario
@@ -17,107 +16,107 @@ class InventarioForm(ModelForm):
 
             'cod_inven': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el codigo del producto',
                 }
             ),
             'descripcion': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el nombre del producto',
                 }
             ),
             'valor_costo': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'valor_venta': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'unidad_compra': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese un la unidad',
                 }
             ),
             'stock': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'stock_min': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'm1': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor ',
                 }
             ),
             'm2': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'm3': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'v1': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'v2': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'v3': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'vf1': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'vf2': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'vf3': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'p1': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'p2': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor ',
                 }
             ),
             'p3': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el valor',
                 }
             ),
             'factor': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese el factor de disolucion',
                 }
             ),
             'densidad': TextInput(
                 attrs={
-                    'placeholder': 'Ingrese un nombre',
+                    'placeholder': 'Ingrese la densidad',
                 }
             ),
             #Poner un selec para manejar una sola linea de los tipos del inventario#

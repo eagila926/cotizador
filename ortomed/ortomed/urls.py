@@ -8,6 +8,9 @@ urlpatterns = [
     path('', login),
     
 
-    path("inventario/list/", InventarioListView.as_view(), name="inventario_list")
+    path("inventario/list/", InventarioListView.as_view(), name="inventario_list"),
+    path("inventario/add/", InventarioCreateview.as_view(), name="inventario_add"),
+
+
 ]
 
