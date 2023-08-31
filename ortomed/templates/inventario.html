@@ -73,16 +73,18 @@
 
 {% block javascript %}
     <script>
+        
         $(document).ready(function() {
+            
             $('#data').DataTable({
                 responsive: true,
                 autoWidth: false
-            }); 
+            });
         });
 
         $('.btnTest').on('click', function(){
             alert("x");
-            consol.log("prueba")
+            console.log("prueba");
     
         });
         

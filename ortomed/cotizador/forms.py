@@ -1,5 +1,5 @@
 from django.forms import *
-from .models import Inventario, Usuario
+from .models import Inventario, Usuario, Formulas
 
 class InventarioForm(ModelForm):
     
@@ -49,66 +49,6 @@ class InventarioForm(ModelForm):
                     'placeholder': 'Ingrese el valor',
                 }
             ),
-            'm1': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor ',
-                }
-            ),
-            'm2': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'm3': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'v1': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'v2': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'v3': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'vf1': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'vf2': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'vf3': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'p1': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
-            'p2': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor ',
-                }
-            ),
-            'p3': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese el valor',
-                }
-            ),
             'factor': TextInput(
                 attrs={
                     'placeholder': 'Ingrese el factor de disolucion',
@@ -128,7 +68,7 @@ class InventarioForm(ModelForm):
         }
 
 class UsuarioForm(ModelForm):
-    
+        
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # for form in self.visible_fields():
@@ -180,4 +120,41 @@ class UsuarioForm(ModelForm):
             
         }
 
-    
+
+class FormulaForm(ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    class Meta:
+        model = Formulas
+        fields = '__all__'
+        widgets = {
+            'cod_formula': Select(attrs={
+                'class': 'form-control select2',
+                'style': 'with 100%'
+            }),
+            'nombre': TextInput(attrs={
+                'class': 'form-control'
+            }),
+            'precio_venta': TextInput(attrs={
+                'readonly': True,
+                'class': 'form-control',
+            }),
+            'precio_compra': TextInput(attrs={
+                'readonly': True,
+                'class': 'form-control',
+            }),
+            'cod_user': Select(attrs={
+                'class': 'form-control select2',
+                'style': 'with 100%'
+            }),
+            'cod_cliente': Select(attrs={
+                'class': 'form-control select2',
+                'style': 'with 100%'
+            }),
+            'cod_doc': Select(attrs={
+                'class': 'form-control select2',
+                'style': 'with 100%'
+            })     
+
+        }    
