@@ -1,8 +1,13 @@
-{% extends "inventario.html" %}
+{% extends "body.html" %}
 {% load static %}
 {% block head_list %}
-<link href="{% static 'lib/jquery-ui-1.12.1/jquery-ui.min.css' %}" rel="stylesheet"/>
-    <script src="{% static 'lib/jquery-ui-1.12.1/jquery-ui.min.js' %}"></script>
+    <link href="{% static 'lib/jquery-ui-1.12.1/jquery-ui.min.css' %}" rel="stylesheet"/>
+    <script src="{% static 'lib/jquery-ui-1.12.1/jquery-ui.min.js' %}"></script> 
+
+    {% comment %} <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="/resources/demos/style.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script> {% endcomment %}
 
     <link href="{% static 'lib/select2-4.0.13/css/select2.min.css' %}" rel="stylesheet"/>
     <link href="{% static 'lib/select2-4.0.13/css/select2-bootstrap4.min.css' %}" rel="stylesheet"/>
@@ -17,8 +22,55 @@
     <script src="{% static 'lib/bootstrap-touchspin-4.3.0/jquery.bootstrap-touchspin.js' %}"></script>
 
     <script src="{% static 'js/formula.js' %}"></script>
+    
 {% endblock %}
-<div class="form-group">
-    <label>Buscador:</label>
-    {{ form.search }}
-</div>
+{% block content %}
+    <div class="form-group">
+        <label for="tags">Buscador:</label>
+        <input id="tags"> 
+    </div>
+
+    
+{% endblock content %}
+
+{% block javascript %}
+<script>
+    $( function() {
+          console.log('ingreso a la funcion')
+          var availableTags = [
+            "ActionScript",
+            "AppleScript",
+            "Asp",
+            "BASIC",
+            "C",
+            "C++",
+            "Clojure",
+            "COBOL",
+            "ColdFusion",
+            "Erlang",
+            "Fortran",
+            "Groovy",
+            "Haskell",
+            "Java",
+            "JavaScript",
+            "Lisp",
+            "Perl",
+            "PHP",
+            "Python",
+            "Ruby",
+            "Scala",
+            "Scheme"
+        ];
+        console.log(availableTags)
+        $( "#tags" ).autocomplete({
+            source: availableTags
+        });
+        } );
+    </script>
+
+
+{% endblock javascript%}
+
+
+
+

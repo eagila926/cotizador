@@ -84,28 +84,28 @@ class FormulaCreateView (CreateView):
                 activs = Inventario.objects.filter(name__incontains=request.POST['term'])[0:10]
                 for i in activs:
                     item = i.toJSON()
-                    item['value'] = i.descripcion
+                    item['value'] = i.cod_inven
                     data.append(item)
-            # elif action == 'add':
-            #     with transaction.atomic():
-            #         formuls = json.loads(request.POST['formuls'])
-            #         formula = Formulas()
-            #         formula.cod_formula = formuls['cod_formula']
-            #         formula.nombre = formuls['nombre']
-            #         formula.precio_venta = float(formuls['precio_venta'])
-            #         formula.precio_compra = float(formuls['precio_compra'])
-            #         formula.cod_user = formuls['cod_user']
-            #         formula.save()
-            #         for i in formuls['activos']:
-            #             detformu = DetFormula()
-            #             detformu.formula = formula.id
-            #             detformu.activos = i['cod_inven']
-            #             detformu.cant = int(i['cant'])
-            #             detformu.dosis = int(i['dosis'])
-            #             detformu.posologia = int(i['posologia'])
-            #             detformu.date_joined = i['date_joined']
-            #             detformu.obs = i['obs']
-            #             detformu.save()
+            elif action == 'add':
+                with transaction.atomic():
+                    formuls = json.loads(request.POST['formuls'])
+                    formula = Formulas()
+                    formula.cod_formula = formuls['cod_formula']
+                    formula.nombre = formuls['nombre']
+                    formula.precio_venta = float(formuls['precio_venta'])
+                    formula.precio_compra = float(formuls['precio_compra'])
+                    formula.cod_user = formuls['cod_user']
+                    formula.save()
+                    for i in formuls['activos']:
+                        detformu = DetFormula()
+                        detformu.formula = formula.id
+                        detformu.activos = i['cod_inven']
+                        detformu.cant = int(i['cant'])
+                        detformu.dosis = int(i['dosis'])
+                        detformu.posologia = int(i['posologia'])
+                        detformu.date_joined = i['date_joined']
+                        detformu.obs = i['obs']
+                        detformu.save()
             else:
                 data['error'] = 'No ha ingresado a ninguna opcion'
         except Exception as e:
@@ -121,6 +121,16 @@ class FormulaCreateView (CreateView):
         context['detformu'] = []
         return context
 
+class PedidoListView (ListView):
+    model = Formulas
+    template_name = 'pedidos.html'
+
+    def get_context_data(self, **kwargs):
+        context =super().get_context_data(**kwargs)
+        context['title'] = 'Test'
+        
+        return context
+  
     
     
 
