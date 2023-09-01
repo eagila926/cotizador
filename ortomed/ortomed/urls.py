@@ -10,6 +10,8 @@ urlpatterns = [
 
     path("inventario/list/", InventarioListView.as_view(), name="inventario_list"),
     path("inventario/add/", InventarioCreateview.as_view(), name="inventario_add"),
+    path("formula/no_establecida/", FormulaCreateView.as_view(), name="formula_new"),
+    path("test/", FormulaCreateView.as_view(), name="test"),
 
 
 ]
