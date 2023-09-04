@@ -65,6 +65,11 @@ class InventarioForm(ModelForm):
                     'placeholder': 'Ingrese un nombre',
                 }
             ),
+             'cant': TextInput(
+                attrs={
+                    'placeholder': 'Ingrese la cantidad',
+                }
+            ),
         }
 
 class UsuarioForm(ModelForm):
@@ -146,15 +151,24 @@ class FormulaForm(ModelForm):
             }),
             'cod_user': Select(attrs={
                 'class': 'form-control select2',
-                'style': 'with 100%'
+
             }),
             'cod_cliente': Select(attrs={
                 'class': 'form-control select2',
-                'style': 'with 100%'
+                
             }),
             'cod_doc': Select(attrs={
                 'class': 'form-control select2',
-                'style': 'with 100%'
-            })     
+            }),
+             'cant': TextInput(attrs={
+                'class': 'form-control'
+            }),
+             'dosis': TextInput(attrs={
+                'class': 'form-control'
+            }),
+             'posologia': TextInput(attrs={
+                'readonly': True,
+                'class': 'form-control'
+            }),     
 
         }    

@@ -14,7 +14,7 @@ class Usuario(models.Model):
     ciudad = models.TextField(verbose_name='Ciudad')
     pais = models.TextField(verbose_name='Pais')
 
-    def _str_(self):
+    def __str__(self):
         return self.cod_user
     
     class Meta:
@@ -34,10 +34,25 @@ class Inventario(models.Model):
     factor = models.DecimalField(max_digits=15, decimal_places=3, verbose_name="Factor")
     densidad = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='Densidad')
     tipo = models.TextField(verbose_name=("Tipo"))
+    cant = models.IntegerField(verbose_name=("Cantidad"))
 
-    def _str_(self):               #permite transformar los objetos a string
-        return self.cod_inven
+    def __str__(self):               #permite transformar los objetos a string
+        return self.descripcion
     
+    def toJSON(self):
+        item = model_to_dict(self)
+        item['cod_inven'] = "{:.2f}".format(self.cod_inven)
+        item['descripcion'] = self.descripcion
+        item['valor_costo'] = "{:.2f}".format(self.valor_costo)
+        item['valor_venta'] = "{:.2f}".format(self.valor_venta)
+        item['unidad_compra'] = self.unidad_compra
+        item['stock'] = "{:.2f}".format(self.stock)
+        item['stock_min'] = "{:.2f}".format(self.stock_min)
+        item['factor'] = "{:.3f}".format(self.factor)
+        item['densidad'] = "{:.4f}".format(self.densidad)
+        item['tipo'] = self.tipo
+        return item
+
     class Meta:
         verbose_name = 'Inventario'
         verbose_name_plural = 'Inventarios'
@@ -53,7 +68,7 @@ class Clientes(models.Model):
     tipo = models.TextField(verbose_name="Tipo")
     cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.CASCADE)
 
-    def _str_(selfs):
+    def __str__(selfs):
         return selfs.nombre
     
     def toJSON(self):
@@ -74,7 +89,7 @@ class Doctores(models.Model):
     ciudad = models.TextField( verbose_name="Ciudad")
     cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.CASCADE)
 
-    def _str_(selfs):
+    def __str__(selfs):
         return selfs.nombre
     
     def toJSON(self):
@@ -95,8 +110,13 @@ class Formulas(models.Model):
     cod_user = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     cod_cliente = models.ForeignKey(Clientes, on_delete=models.CASCADE)
     cod_doc = models.ForeignKey(Doctores, on_delete=models.CASCADE)
+    #dosis hace referencia a cuantos dias va ha tomar el medicamento
+    dosis = models.IntegerField(default=0) 
+    # la posologia hace referencia a cuantas pasillas diarias debe tomar
+    posologia = models.IntegerField(default=0)
+    cant = models.IntegerField(default=0)
 
-    def _str_(self):
+    def __str__(self):
         return self.cod_user.nombre, self.cod_doc.nombre, self.cod_cliente.nombre
     
     def toJSON(self):
@@ -118,10 +138,6 @@ class DetFormula(models.Model):
     formula = models.ForeignKey(Formulas, on_delete=models.CASCADE)
     activos = models.ForeignKey(Inventario, on_delete=models.CASCADE)
     cant = models.IntegerField(default=0)
-    #dosis hace referencia a cuantos dias va ha tomar el medicamento
-    dosis = models.IntegerField(default=0) 
-    # la posologia hace referencia a cuantas pasillas diarias debe tomar
-    posologia = models.IntegerField(default=0)
     date_joined = models.DateField(default=datetime.now)
     obs = models.CharField(max_length=150, verbose_name='Observaciones')
 
@@ -150,7 +166,7 @@ class Visitas(models.Model):
     tipo = models.IntegerField(verbose_name=("Tipo"))
     cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Usuario"), on_delete=models.CASCADE)
 
-    def _str_(selfs):
+    def __str__(selfs):
         return selfs.nombre
     
     def toJSON(self):

@@ -13,7 +13,7 @@ var formus = {
         this.list();
     },
     list: function () {
-        this.calculate_invoice();
+
         tblFormu = $('#tblFormu').DataTable({
             responsive: true,
             autoWidth: false,
@@ -22,10 +22,10 @@ var formus = {
             columns: [
                 {"data": "id"},
                 {"data": "descripcion"},
-                {"data": "cat.name"},
-                {"data": "pvp"},
+                {"data": "factor"},
+                {"data": "densidad"},
                 {"data": "cant"},
-                {"data": "subtotal"},
+                {"data": "cant"},
             ],
             columnDefs: [
                 {
@@ -98,8 +98,9 @@ $(function () {
                 dataType: 'json',
             }).done(function (data) {
                 response(data);
+                console.log(data);
             }).fail(function (jqXHR, textStatus, errorThrown) {
-                alert(textStatus + ': ' + errorThrown);
+                //alert(textStatus + ': ' + errorThrown);
             }).always(function (data) {
 
             });
@@ -107,11 +108,8 @@ $(function () {
         delay: 500,
         minLength: 1,
         select: function (event, ui) {
-            console.log('Data',data)
             event.preventDefault();
-            console.clear();
-            
-            ui.item.cant = 1;
+            console.clear();            
             console.log(formus.items);
             formus.add(ui.item);
             $(this).val('');
