@@ -1,4 +1,8 @@
+from datetime import datetime
 from django.db import models
+from django.forms import model_to_dict
+
+from ortomed.settings import  STATIC_URL
 
 # Create your models here.
 class Usuario(models.Model):
@@ -10,8 +14,8 @@ class Usuario(models.Model):
     ciudad = models.TextField(verbose_name='Ciudad')
     pais = models.TextField(verbose_name='Pais')
 
-    def _str_(selfs):
-        return selfs.cod_user
+    def _str_(self):
+        return self.cod_user
     
     class Meta:
         verbose_name = 'Usuario'
@@ -22,29 +26,17 @@ class Usuario(models.Model):
 class Inventario(models.Model):
     cod_inven = models.IntegerField(verbose_name=("Codigo Inventario"), primary_key=True)
     descripcion = models.TextField(verbose_name='Descripcion')
-    valor_costo = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Costo')
-    valor_venta = models.DecimalField(max_digits=10, decimal_places=4, verbose_name='Valor Venta')
+    valor_costo = models.DecimalField(max_digits=20, decimal_places=4, verbose_name='Valor Costo')
+    valor_venta = models.DecimalField(max_digits=20, decimal_places=4, verbose_name='Valor Venta')
     unidad_compra = models.TextField(max_length=3,verbose_name='Unidad Compra')
     stock = models.DecimalField(max_digits=15, decimal_places=4, verbose_name='Stock')
     stock_min = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='Stock FIn')
-    m1 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='m1')
-    m2 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='m2')
-    m3 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='m3')
-    v1 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='v1')
-    v2 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='v2')
-    v3 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='v3')
-    vf1 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='vf1')
-    vf2 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='vf2')
-    vf3 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='vf3')
-    p1 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='p1')
-    p2 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='p2')
-    p3 = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='p3')
-    factor = models.DecimalField(max_digits=15, decimal_places=3, verbose_name=("Factor"))
+    factor = models.DecimalField(max_digits=15, decimal_places=3, verbose_name="Factor")
     densidad = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='Densidad')
     tipo = models.TextField(verbose_name=("Tipo"))
 
-    def _str_(selfs):               #permite transformar los objetos a string
-        return selfs.cod_activo
+    def _str_(self):               #permite transformar los objetos a string
+        return self.cod_inven
     
     class Meta:
         verbose_name = 'Inventario'
@@ -59,15 +51,20 @@ class Clientes(models.Model):
     correo = models.TextField(verbose_name="correo")
     direccion = models.TextField(verbose_name="Direccion")
     tipo = models.TextField(verbose_name="Tipo")
-    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.PROTECT)
+    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.CASCADE)
 
     def _str_(selfs):
         return selfs.nombre
     
+    def toJSON(self):
+        item = model_to_dict(self)
+        item['cod_user'] = self.cod_user.toJSON()
+        return item
+
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
-        ordering: ['nombre']
+        ordering: ['id']
 
 class Doctores(models.Model):
     nombre = models.TextField( verbose_name="Nombre")
@@ -75,10 +72,15 @@ class Doctores(models.Model):
     cedula = models.TextField( verbose_name="cedula", unique=True, null=True)
     direccion = models.TextField( verbose_name="direccion")
     ciudad = models.TextField( verbose_name="Ciudad")
-    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.PROTECT)
+    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Ususario"), on_delete=models.CASCADE)
 
     def _str_(selfs):
         return selfs.nombre
+    
+    def toJSON(self):
+        item = model_to_dict(self)
+        item['cod_user'] = self.cod_user.toJSON()
+        return item
         
     class Meta:
         verbose_name = 'Doctor'
@@ -88,41 +90,56 @@ class Doctores(models.Model):
 class Formulas(models.Model):
     cod_formula = models.TextField(verbose_name=("Codigo Formula"),unique=True)
     nombre = models.TextField(verbose_name=("Nombre Formula"))
-    comp_activos = models.TextField(verbose_name=("Composicion"))
-    cantidad = models.IntegerField(verbose_name=("Cantidad"))
-    unidad_compra = models.TextField(verbose_name=("Unidad de compra"))
-    #dosis hace referencia a cuantos dias va ha tomar el medicamento
-    dosis = models.IntegerField(verbose_name=("Dosis")) 
-    # la posologia hace referencia a cuantas pasillas diarias debe tomar
-    posologia = models.IntegerField(verbose_name=("Posologia"))
+    precio_venta = models.DecimalField(default=0.00, max_digits=15, decimal_places=2)
+    precio_compra = models.DecimalField(default=0.00, max_digits=15, decimal_places=2)    
+    cod_user = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    cod_cliente = models.ForeignKey(Clientes, on_delete=models.CASCADE)
+    cod_doc = models.ForeignKey(Doctores, on_delete=models.CASCADE)
 
-    def _str_(selfs):
-        return selfs.cod_formula
-        
+    def _str_(self):
+        return self.cod_user.nombre, self.cod_doc.nombre, self.cod_cliente.nombre
+    
+    def toJSON(self):
+        item = model_to_dict(self)
+        item['cod_user'] = self.cod_user.toJSON()
+        item['cod_cliente'] = self.cod_cliente.toJSON()
+        item['cod_doc'] = self.cod_doc.toJSON()
+        item['precio_venta'] = format(self.precio_venta, '.2f')
+        item['precio_compra'] = format(self.precio_compra, '.2f')
+        item['det'] = [i.toJSON() for i in self.detformu_set.all()]
+        return item
+
     class Meta:
         verbose_name = 'Formula'
         verbose_name_plural = 'Formulas'
         ordering: ['cod_formula']
 
-class Pedidos(models. Model):
-    descripcion = models.TextField(verbose_name=("Descripcion"))
-    fecha = models.DateTimeField(verbose_name=("Fecha"), auto_now_add=True)
-    estado = models.TextField(verbose_name=("Estado"))
-    cantidad = models.IntegerField(verbose_name=("Cantidad"))
-    observaciones = models.TextField(verbose_name=("Observaciones"))
-    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Usuario"), on_delete=models.PROTECT)
-    cod_cliente = models.ForeignKey("Clientes", verbose_name=("Codigo Cliente"), on_delete=models.PROTECT)
-    cod_doc = models.ForeignKey("Doctores", verbose_name=("Codigo Doctor"), on_delete=models.PROTECT)
+class DetFormula(models.Model):
+    formula = models.ForeignKey(Formulas, on_delete=models.CASCADE)
+    activos = models.ForeignKey(Inventario, on_delete=models.CASCADE)
+    cant = models.IntegerField(default=0)
+    #dosis hace referencia a cuantos dias va ha tomar el medicamento
+    dosis = models.IntegerField(default=0) 
+    # la posologia hace referencia a cuantas pasillas diarias debe tomar
+    posologia = models.IntegerField(default=0)
+    date_joined = models.DateField(default=datetime.now)
+    obs = models.CharField(max_length=150, verbose_name='Observaciones')
 
-
-
-    def _str_(selfs):
-        return selfs.cod_pedido
-        
+    def toJSON(self):
+        item = model_to_dict(self)
+        item['formula'] = self.formula.toJSON()
+        item['activos'] = self.activos.toJSON()
+        item['cant'] = format(self.cant, '.2f')
+        item['dosis'] = format(self.dosis, '.2f')
+        item['posologia'] = format(self.posologia, '.2f')
+        item['date_joined'] = self.date_joined.strftime('%Y-%m-%d')
+        item['obs'] = format(self.obs, '.2f')
+        return item
+    
     class Meta:
-        verbose_name = 'Pedido'
-        verbose_name_plural = 'Pedidos'
-        ordering: ['cod_pedido']
+        verbose_name = 'Detalle de Formula'
+        verbose_name_plural = 'Detalle de Formulas'
+        ordering = ['id']
 
 class Visitas(models.Model):
     nombre = models.TextField(verbose_name=("Nombre"))
@@ -131,12 +148,17 @@ class Visitas(models.Model):
     correo = models.TextField(verbose_name=("Correo"))
     direccion = models.TextField(verbose_name=("Direccion"))
     tipo = models.IntegerField(verbose_name=("Tipo"))
-    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Usuario"), on_delete=models.PROTECT)
+    cod_user = models.ForeignKey("Usuario", verbose_name=("Codigo Usuario"), on_delete=models.CASCADE)
 
     def _str_(selfs):
         return selfs.nombre
+    
+    def toJSON(self):
+        item = model_to_dict(self)
+        item['cod_user'] = self.cod_user.toJSON()
+        return item
         
     class Meta:
         verbose_name = 'Visita'
         verbose_name_plural = 'Visitas'
-        ordering: ['nombre']
+        ordering: ['id']

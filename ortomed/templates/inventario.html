@@ -29,7 +29,9 @@
                         <th scope="col" >Activo</th>
                         <th scope="col" >Valor costo</th>
                         <th scope="col" >Valor venta</th>
-                        <th scope="col" >Unidad de Compra</th>
+                        <th scope="col" >Densidad</th>
+                        <th scope="col" >Factor</th>
+                        <th scope="col" >Und de Compra</th>
                         <th scope="col" >Stock</th>
                         <th scope="col" >Stock min</th>
                         <th scope="col" >Acciones</th>
@@ -42,6 +44,8 @@
                             <td>{{ inv.descripcion }}</td>
                             <td>{{ inv.valor_costo }}</td>
                             <td>{{ inv.valor_venta }}</td>
+                            <td>{{ inv.densidad }}</td>
+                            <td>{{ inv.factor }}</td>
                             <td>{{ inv.unidad_compra }}</td>
                             <td>{{ inv.stock }}</td>
                             <td>{{ inv.stock_min }}</td>
@@ -69,16 +73,18 @@
 
 {% block javascript %}
     <script>
+        
         $(document).ready(function() {
-            $('#data').DataTable({
+            
+            $('.table').DataTable({
                 responsive: true,
                 autoWidth: false
-            }); 
+            });
         });
 
         $('.btnTest').on('click', function(){
             alert("x");
-            consol.log("prueba")
+            console.log("prueba");
     
         });
         
