@@ -78,13 +78,14 @@ class FormulaCreateView (CreateView):
     def post(self, request, *args, **kwargs):
         data={}
         try:
-            action: request.POST['action']
+            action = request.POST['action']
+            
             if action == 'search_activos':
                 data = []
-                activs = Inventario.objects.filter(name__incontains=request.POST['term'])[0:10]
+                activs = Inventario.objects.filter(descripcion__icontains=request.POST['term'])[0:10]
                 for i in activs:
                     item = i.toJSON()
-                    item['value'] = i.cod_inven
+                    item['value'] = i.descripcion
                     data.append(item)
             elif action == 'add':
                 with transaction.atomic():
