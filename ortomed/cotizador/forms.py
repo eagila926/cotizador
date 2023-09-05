@@ -153,15 +153,18 @@ class FormulaForm(ModelForm):
                 'class': 'form-control select2',
 
             }),
-            'cod_cliente': Select(attrs={
-                'class': 'form-control select2',
+            'cod_cliente': TextInput(attrs={
+                
+                'class': 'form-control',
                 
             }),
-            'cod_doc': Select(attrs={
-                'class': 'form-control select2',
+            'cod_doc': TextInput(attrs={
+                
+                'class': 'form-control',
             }),
              'cant': TextInput(attrs={
-                'class': 'form-control'
+                'class': 'form-control',
+                
             }),
              'dosis': TextInput(attrs={
                 'class': 'form-control'
