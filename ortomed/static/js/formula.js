@@ -8,35 +8,27 @@ var formus = {
         activos: []
     },
     calculate_invoice: function () {
-        var mfinal = 0.00;
-        var vfinal = 0.00;
-        
-
-        
+                
         $.each(this.items.activos, function (pos, dict) {
+            console.log('Posisicion',pos);
+            console.log('Diccionario',dict);
             dict.pos = pos;
-            if(dict.unidad_compra === 'mg' || dict.unidad_compra === 'UI'){
-                dict.cant = dict.cant/1000
+
+            if(dict.unidad === 'mg' || dict.unidad === 'UI'){
+                dict.cant = dict.cant/1000;
+                dict.masa_cap = dict.cant * parseFloat(dict.factor);
             }else if(dict.unidad_compra === 'mcg'){
-                dict.cant = dict.cant/1000000
+                dict.cant = dict.cant/1000000;
             }else{
-                dict.cant = dict.cant
+                dict.cant = dict.cant;
             }
-            //quedaste aqui
-            mfinal = dict.cant * parseFloat(dict.factor);
+
+            
+            
 
             
         });
 
-        console.log('masa final',dict.mfinal)
-        this.items.subtotal = subtotal;
-        this.items.iva = this.items.subtotal * iva;
-        this.items.total = this.items.subtotal + this.items.iva;
-
-
-        $('input[name="subtotal"]').val(this.items.subtotal.toFixed(2));
-        $('input[name="ivacalc"]').val(this.items.iva.toFixed(2));
-        $('input[name="total"]').val(this.items.total.toFixed(2));
     },
     add: function (item) {
         this.items.activos.push(item);
@@ -54,9 +46,9 @@ var formus = {
                 {"data": "descripcion"},
                 {"data": "factor"},
                 {"data": "cant"},
-                {"data": "unidad_compra"},
-                {"data": "valor_venta"},
-                {"data": "valor_costo"},
+                {"data": "unidad"},
+                {"data": "masa_cap"},
+                {"data": "masa_final"},
             ],
             columnDefs: [
                 {
@@ -72,7 +64,7 @@ var formus = {
                     class: 'text-center',
                     orderable: false,
                     render: function (data, type, row) {
-                        return '<input type="text" name="cant" class="form-control form-control-sm input-sm" autocomplete="off" value="' + row.cant + '">';
+                        return row.cant;
                     }
                 },
                 {
@@ -80,7 +72,7 @@ var formus = {
                     class: 'text-center',
                     orderable: false,
                     render: function (data, type, row) {
-                        return '<select id="unidad_compra" class="form-control form-control-sm select-sm" autocomplete="off" > <option value="g"> g </option> <option value="mg"> mg </option> <option value="mcg"> mcg </option> <option value="UI"> UI </option>';
+                        return row.unidad;
                     }
                 },
                 {
@@ -88,7 +80,7 @@ var formus = {
                     class: 'text-center',
                     orderable: false,
                     render: function (data, type, row) {
-                        return '$' + parseFloat(data).toFixed(2);
+                        return row.masa_cap+' g';
                     }
                 },
                 {
@@ -96,9 +88,10 @@ var formus = {
                     class: 'text-center',
                     orderable: false,
                     render: function (data, type, row) {
-                        return '$' + parseFloat(data).toFixed(2);
+                        return row.masa_final+' g';
                     }
                 },
+                
                 
             ],
             rowCallback(row, data, displayNum, displayIndex, dataIndex) {
@@ -148,13 +141,50 @@ $(function () {
         delay: 500,
         minLength: 1,
         select: function (event, ui) {
-            event.preventDefault();
-            console.clear();            
-            console.log(formus.items);
-            formus.add(ui.item);
-            $(this).val('');
+
+            console.clear();
+            
+            ui.item.cant = 0;           
+            ui.item.masa_cap = 0;           
+            ui.item.masa_final = 0;
+            ui.item.unidad = "g";
+
+            $('#tblformu tbody')
+                .on('click', 'a[rel="remove"]', function () {
+                    var tr = tblformu.cell($(this).closest('td, li')).index();
+                    alert_action('Notificación', '¿Estas seguro de eliminar el producto de tu detalle?', function () {
+                        formus.items.activos.splice(tr.row, 1);
+                        formus.list();
+                    });
+                })
+                .on('change', 'input[name="cant"]', function () {
+                    console.clear();
+                    var cant = parseInt($(this).val());
+                    var tr = tblformu.cell($(this).closest('td, li')).index();
+                    formus.items.activos[tr.row].cant = cant;
+                    formus.calculate_invoice();
+                    //$('td:eq(5)', tblformu.row(tr.row).node()).html('$' + formus.items.activos[tr.row].subtotal.toFixed(2));
+                })
+                .on('change', 'select[name="unit"]', function () {
+                    console.clear();
+                    var unidad = String($(this).val());
+                    var tr = tblformu.cell($(this).closest('td, li')).index();
+                    formus.items.activos[tr.row].unidad = unidad;
+                    formus.calculate_invoice();
+                    
+                });
+                $('.btnAddActivo').on('click', function () {
+                    event.preventDefault();
+                    formus.calculate_invoice();
+                    console.log(formus.items);
+                    formus.add(ui.item);
+                    $(this).val('');
+                });
+            
         }
     });
+
+    
 
     $('.btnRemoveAll').on('click', function () {
         if (formus.items.activos.length === 0) return false;
@@ -179,9 +209,17 @@ $(function () {
             var tr = tblformu.cell($(this).closest('td, li')).index();
             formus.items.activos[tr.row].cant = cant;
             formus.calculate_invoice();
-            $('td:eq(5)', tblformu.row(tr.row).node()).html('$' + formus.items.activos[tr.row].subtotal.toFixed(2));
+            //$('td:eq(5)', tblformu.row(tr.row).node()).html('$' + formus.items.activos[tr.row].subtotal.toFixed(2));
+        })
+        .on('change', 'select[name="unit"]', function () {
+            console.clear();
+            var unidad = String($(this).val());
+            var tr = tblformu.cell($(this).closest('td, li')).index();
+            formus.items.activos[tr.row].unidad = unidad;
+            formus.calculate_invoice();
+            
         });
-
+    
     $('.btnClearSearch').on('click', function () {
         $('input[name="search"]').val('').focus();
     });
@@ -205,7 +243,5 @@ $(function () {
         });
     });
     
-    // Esto se puso aqui para que funcione bien el editar y calcule bien los valores del iva. // sino tomaría el valor del iva de la base debe
-    // coger el que pusimos al inicializarlo. 
     formus.list();
 });

@@ -34,7 +34,6 @@ class Inventario(models.Model):
     factor = models.DecimalField(max_digits=15, decimal_places=3, verbose_name="Factor")
     densidad = models.DecimalField(max_digits=15, decimal_places=4,verbose_name='Densidad')
     tipo = models.TextField(verbose_name=("Tipo"))
-    cant = models.IntegerField(verbose_name=("Cantidad"))
 
     def __str__(self):               #permite transformar los objetos a string
         return self.descripcion
@@ -138,7 +137,10 @@ class DetFormula(models.Model):
     formula = models.ForeignKey(Formulas, on_delete=models.CASCADE)
     activos = models.ForeignKey(Inventario, on_delete=models.CASCADE)
     cant = models.IntegerField(default=0)
-    date_joined = models.DateField(default=datetime.now)
+    masa_cap= models.DecimalField(default=0.00, max_digits=15, decimal_places=2)
+    masa_final= models.DecimalField(default=0.00, max_digits=15, decimal_places=2)
+    vol_final= models.DecimalField(default=0.00, max_digits=15, decimal_places=2)
+    unidad = models.CharField(max_length=3, verbose_name='Unidad Compra')
     obs = models.CharField(max_length=150, verbose_name='Observaciones')
 
     def toJSON(self):
@@ -146,9 +148,10 @@ class DetFormula(models.Model):
         item['formula'] = self.formula.toJSON()
         item['activos'] = self.activos.toJSON()
         item['cant'] = format(self.cant, '.2f')
-        item['dosis'] = format(self.dosis, '.2f')
-        item['posologia'] = format(self.posologia, '.2f')
-        item['date_joined'] = self.date_joined.strftime('%Y-%m-%d')
+        item['masa_cap'] = format(self.masa_cap, '.2f')
+        item['masa_final'] = format(self.masa_final, '.2f')
+        item['vol_final'] = format(self.vol_final, '.2f')
+        item['unidad'] = self.formula.toJSON()
         item['obs'] = format(self.obs, '.2f')
         return item
     

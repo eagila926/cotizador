@@ -65,11 +65,6 @@ class InventarioForm(ModelForm):
                     'placeholder': 'Ingrese un nombre',
                 }
             ),
-             'cant': TextInput(
-                attrs={
-                    'placeholder': 'Ingrese la cantidad',
-                }
-            ),
         }
 
 class UsuarioForm(ModelForm):
