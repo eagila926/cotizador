@@ -1,5 +1,5 @@
 from django.forms import *
-from .models import Inventario, Usuario, Formulas
+from .models import *
 
 class InventarioForm(ModelForm):
     
@@ -169,4 +169,9 @@ class FormulaForm(ModelForm):
                 'class': 'form-control'
             }),     
 
-        }    
+        }
+
+class ActivosFormulasForm(ModelForm):
+    class Meta:
+        model = ActivosFormulas
+        fields = ['codigoOdoo', 'activo', 'cantidad', 'unidad']

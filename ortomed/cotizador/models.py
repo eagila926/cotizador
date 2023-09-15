@@ -181,3 +181,15 @@ class Visitas(models.Model):
         verbose_name = 'Visita'
         verbose_name_plural = 'Visitas'
         ordering: ['id']
+
+class ActivosFormulas(models.Model):
+    
+    codigoOdoo = models.IntegerField()
+    activo = models.CharField(max_length=100)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    unidad = models.CharField(max_length=10, default='g')
+    
+    class Meta:
+        verbose_name = 'Activo Formula'
+        verbose_name_plural = 'Activos Formulas'
+        ordering = ['id']

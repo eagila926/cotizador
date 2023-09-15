@@ -23,7 +23,7 @@
     <link href="{% static 'lib/bootstrap-touchspin-4.3.0/jquery.bootstrap-touchspin.css' %}" rel="stylesheet"/>
     <script src="{% static 'lib/bootstrap-touchspin-4.3.0/jquery.bootstrap-touchspin.js' %}"></script>
 
-    <script src="{% static 'js/formula.js' %}"></script>
+    <script src="{% static 'js/selecactivos.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -31,17 +31,13 @@
         <div class="card card-primary">
             <div class="card-header">
                 <h3 class="card-title">
-                    {% if action == 'add' %}
-                        <i class="fas fa-plus"></i> 
-                    {% else %}
-                        <i class="fas fa-edit"></i>
-                    {% endif %}
+                    <i class="fas fa-plus"></i> 
                     {{ title }}
                 </h3>
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-lg-9">
+                    <div class="col-lg-12">
                         <div class="card card-secondary">
                             <div class="card-header">
                                 <h3 class="card-title"><i class="fas fa-boxes"></i> Detalle de activos</h3>
@@ -71,6 +67,7 @@
                                         <div class="form-group">
                                             <label>Unidad</label>
                                             <select class= "form-control" name="unidad">
+                                                <option value=""></option>
                                                 <option value="g">g</option>
                                                 <option value="mg">mg</option>
                                                 <option value="mcg">mcg</option>
@@ -82,26 +79,33 @@
                                   </div>
                                 <div class= "row">
                                     <div class="col-lg-6">
-                                        <button type="button" class="btn btn-success btn-xs btn-flat btnAddActivo">
+                                        <button type="button" class="btn btn-success btn-flat btnAddActivo">
                                             <i class="fas fa-plus"></i> Añadir Activo
                                         </button>
                                     </div>
                                 </div> 
                                 <hr>
-                                <button type="button" class="btn btn-danger btn-xs btn-flat btnRemoveAll">
-                                    <i class="fas fa-trash"></i> Eliminar todos mis items
-                                </button>
+                                <div class= "row">
+                                    <div class="col-lg-10">
+                                        <button type="button" class="btn btn-danger btn-flat btnRemoveAll">
+                                            <i class="fas fa-trash"></i> Eliminar todos mis items
+                                        </button> 
+                                    </div>
+                                    <div class="col-lg-2">
+                                        <button type="submit" class="btn btn-primary btn-flat btnCotizar" style="margin-left:90px">
+                                            <i class="fas fa-save"></i> Cotizar
+                                        </button> 
+                                    </div>
+                                </div>
                                 <hr>
                                 <table class="table table-bordered" id="tblformu">
                                     <thead>
                                     <tr>
-                                        <th>Eliminar</th>
-                                        <th>Activo</th>
-                                        <th>Factor</th>
-                                        <th>Cantidad</th>
-                                        <th>Unidad</th>
-                                        <th>Masa Capsula</th>
-                                        <th>Masa Final</th>
+                                        <th scope="col" style="width: 10%">Eliminar</th>
+                                        <th scope="col" style="width: 10%">Código ODOO</th>
+                                        <th scope="col" style="width: 40%">Activo</th>
+                                        <th scope="col" style="width: 20%">Cantidad</th>
+                                        <th scope="col" style="width: 20%">Unidad</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -110,67 +114,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-3">
-                        <div class="card card-secondary">
-                            <div class="card-header">
-                                <h3 class="card-title"><i class="fas fa-shopping-cart"></i> Datos de la Formula</h3>
-                            </div>
-                            <div class="card-body">
-                                <input type="hidden" name="action" value="{{ action }}">
-                                <div class="form-group">
-                                    <label>Formula:</label>
-                                    {{ form.nombre }}
-                                </div>
-                                <div class="form-group">
-                                    <label>Dosis diaria:</label>
-                                    {{ form.posologia }}
-                                </div>
-                                <div class="form-group">
-                                    <label>Dias de tratamiento:</label>
-                                    {{ form.dosis }}
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label>Precio Venta:</label>
-                                    {{ form.precio_venta }}
-                                </div>
-                                <div class="form-group">
-                                    <label>Precio Compra:</label>
-                                    {{ form.precio_compra }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-flat">
-                            <i class="fas fa-save"></i> Pedir
-                        </button>
-                        <a href="{{ list_url }}" class="btn btn-danger btn-flat">
-                            <i class="fas fa-times"></i> Cancelar
-                        </a>
-
-
-                    </div>
                 </div>
             </div>
             <div class="card-footer">
-                <div class="row">
-                    <div class="col-lg-9">
-                        <label>Precio Medido(real):</label><br>
-                        
-                        <label>Precio Cliente(+33.33%):</label><br>
-                        
-                        <label>Precio Distribuidor(-35%):</label>
-
-                    </div>
-                    <div class="col-lg-3">
-                        {% comment %} <button type="submit" class="btn btn-primary btn-flat">
-                            <i class="fas fa-save"></i> Pedir
-                        </button>
-                        <a href="{{ list_url }}" class="btn btn-danger btn-flat">
-                            <i class="fas fa-times"></i> Cancelar
-                        </a> {% endcomment %}
-                    </div>
-                  </div>
                 
             </div>
         </div>

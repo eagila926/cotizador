@@ -1,0 +1,81 @@
+<!--Agregar la opcion de agregar activos con un modal-->
+
+{% extends "body.html" %}
+{%load static%}
+{% block head %}
+    <link rel="stylesheet" href="{% static 'lib/datatables-1.13.6/css/dataTables.bootstrap4.min.css' %}"/>
+    <link rel="stylesheet"
+        href="{% static 'lib/datatables-1.13.6/plugins/responsive-2.5.0/css/responsive.bootstrap4.min.css' %}"/>
+    <script src="{% static 'lib/datatables-1.13.6/js/jquery.dataTables.js' %}"></script>
+    <script src="{% static 'lib/datatables-1.13.6/js/dataTables.bootstrap4.min.js' %}"></script>
+    <script src="{% static 'lib/datatables-1.13.6/plugins/responsive-2.5.0/js/dataTables.responsive.min.js' %}"></script>
+    <script src="{% static 'lib/datatables-1.13.6/plugins/responsive-2.5.0/js/responsive.bootstrap4.min.js' %}"></script>
+
+{% endblock head %}
+
+{% block content %}
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-list-alt"></i>
+                Resumen de la Fórmula
+            </h3>
+        </div>
+        <div class="card-body">
+            <table class="table" id="det_formu">
+                <thead>
+                    <tr>
+                        <th scope="col" >Código ODOO</th>
+                        <th scope="col" >Activo</th>
+                        <th scope="col" >Cantidad</th>
+                        <th scope="col" >Unidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for det in object_list%}
+                        <tr>
+                            <td>{{ det.codigoOdoo }}</td>
+                            <td>{{ det.activo }}</td>
+                            <td>{{ det.cantidad }}</td>
+                            <td>{{ det.unidad }}</td>
+                            <td>
+                                <button type="button" class="btn btn-success btn-xs btn-flat">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-danger btn-xs btn-flat">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            
+        </div>
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    <script>
+        
+        $(document).ready(function() {
+            
+            $('#det_formu').DataTable({
+                
+                responsive: true,
+                autoWidth: false
+            });
+        });
+
+        $('.btnTest').on('click', function(){
+            alert("x");
+            console.log("prueba");
+    
+        });
+        
+    </script>
+{% endblock %}
+
