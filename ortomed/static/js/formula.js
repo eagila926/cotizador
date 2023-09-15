@@ -10,29 +10,29 @@ var formus = {
     calculate_invoice: function () {
                 
         $.each(this.items.activos, function (pos, dict) {
-            console.log('Posisicion',pos);
-            console.log('Diccionario',dict);
-            dict.pos = pos;
+            
+            
 
             if(dict.unidad === 'mg' || dict.unidad === 'UI'){
+                dict.pos = pos;
                 dict.cant = dict.cant/1000;
                 dict.masa_cap = dict.cant * parseFloat(dict.factor);
+                dict.masa_final=0;
             }else if(dict.unidad_compra === 'mcg'){
+                dict.pos = pos;
                 dict.cant = dict.cant/1000000;
+                dict.masa_cap = dict.cant * parseFloat(dict.factor);
+                dict.masa_final=0;
             }else{
                 dict.cant = dict.cant;
-            }
-
-            
-            
-
-            
+                dict.masa_cap = dict.cant * parseFloat(dict.factor);
+                dict.masa_final=0;
+            }    
         });
 
     },
     add: function (item) {
-        this.items.activos.push(item);
-        this.list();
+        this.items.activos.push(item);  
     },
     list: function () {
 
@@ -144,42 +144,47 @@ $(function () {
 
             console.clear();
             
-            ui.item.cant = 0;           
-            ui.item.masa_cap = 0;           
-            ui.item.masa_final = 0;
-            ui.item.unidad = "g";
+            $('.form-group')
+                .on('change keyup', 'input[name="cant"]', function () {
+                    ui.item.cant = parseInt($(this).val());
+                    // var cant = ui.item.cant;
+                    // $('#tblformu tbody')
+                    // .on('change', 'tr', function () {
+                    //     var tr = tblformu.cell($(this).closest('td, li')).index();
+                    //     formus.items.activos[tr.row].cant = cant;
+                    //     //formus.calculate_invoice();
+                    // });
 
-            $('#tblformu tbody')
-                .on('click', 'a[rel="remove"]', function () {
-                    var tr = tblformu.cell($(this).closest('td, li')).index();
-                    alert_action('Notificación', '¿Estas seguro de eliminar el producto de tu detalle?', function () {
-                        formus.items.activos.splice(tr.row, 1);
-                        formus.list();
-                    });
-                })
-                .on('change', 'input[name="cant"]', function () {
-                    console.clear();
-                    var cant = parseInt($(this).val());
-                    var tr = tblformu.cell($(this).closest('td, li')).index();
-                    formus.items.activos[tr.row].cant = cant;
-                    formus.calculate_invoice();
+                    
                     //$('td:eq(5)', tblformu.row(tr.row).node()).html('$' + formus.items.activos[tr.row].subtotal.toFixed(2));
                 })
-                .on('change', 'select[name="unit"]', function () {
+                .on('change keyup', 'select[name="unidad"]', function () {
                     console.clear();
-                    var unidad = String($(this).val());
-                    var tr = tblformu.cell($(this).closest('td, li')).index();
-                    formus.items.activos[tr.row].unidad = unidad;
-                    formus.calculate_invoice();
+                    ui.item.unidad = String($(this).val());
+                    // var unidad = ui.item.unidad;
+                    // $('#tblformu tbody')
+                    // .on('change', 'tr', function () {
+                    //     var tr = tblformu.cell($(this).closest('td, li')).index();
+                    //     formus.items.activos[tr.row].unidad = unidad;
+                    //     //formus.calculate_invoice();
+
+                    // });
+                    
                     
                 });
-                $('.btnAddActivo').on('click', function () {
-                    event.preventDefault();
-                    formus.calculate_invoice();
-                    console.log(formus.items);
-                    formus.add(ui.item);
-                    $(this).val('');
-                });
+            formus.add(ui.item);
+            $('.btnAddActivo').on('click', function () {
+                    
+                formus.calculate_invoice();
+                console.log(formus.items);
+                
+                event.preventDefault();
+                formus.list();
+                $('input[name="search"]').val('');
+                $('input[name="cant"]').val('');
+                $('select[name="unidad"]').val('g');
+                    
+            });
             
         }
     });
@@ -195,6 +200,7 @@ $(function () {
     });
 
     // event cant
+
     $('#tblformu tbody')
         .on('click', 'a[rel="remove"]', function () {
             var tr = tblformu.cell($(this).closest('td, li')).index();
@@ -202,22 +208,6 @@ $(function () {
                 formus.items.activos.splice(tr.row, 1);
                 formus.list();
             });
-        })
-        .on('change', 'input[name="cant"]', function () {
-            console.clear();
-            var cant = parseInt($(this).val());
-            var tr = tblformu.cell($(this).closest('td, li')).index();
-            formus.items.activos[tr.row].cant = cant;
-            formus.calculate_invoice();
-            //$('td:eq(5)', tblformu.row(tr.row).node()).html('$' + formus.items.activos[tr.row].subtotal.toFixed(2));
-        })
-        .on('change', 'select[name="unit"]', function () {
-            console.clear();
-            var unidad = String($(this).val());
-            var tr = tblformu.cell($(this).closest('td, li')).index();
-            formus.items.activos[tr.row].unidad = unidad;
-            formus.calculate_invoice();
-            
         });
     
     $('.btnClearSearch').on('click', function () {
