@@ -12,13 +12,12 @@ var formus = {
         $.each(this.items.activos, function (pos, dict) {
             
             
-
             if(dict.unidad === 'mg' || dict.unidad === 'UI'){
                 dict.pos = pos;
                 dict.cant = dict.cant/1000;
                 dict.masa_cap = dict.cant * parseFloat(dict.factor);
                 dict.masa_final=0;
-            }else if(dict.unidad_compra === 'mcg'){
+            }else if(dict.unidad === 'mcg'){
                 dict.pos = pos;
                 dict.cant = dict.cant/1000000;
                 dict.masa_cap = dict.cant * parseFloat(dict.factor);
@@ -44,11 +43,8 @@ var formus = {
             columns: [
                 {"data": "cod_inven"},
                 {"data": "descripcion"},
-                {"data": "factor"},
                 {"data": "cant"},
-                {"data": "unidad"},
-                {"data": "masa_cap"},
-                {"data": "masa_final"},
+                
             ],
             columnDefs: [
                 {
@@ -161,6 +157,7 @@ $(function () {
                 .on('change keyup', 'select[name="unidad"]', function () {
                     console.clear();
                     ui.item.unidad = String($(this).val());
+
                     // var unidad = ui.item.unidad;
                     // $('#tblformu tbody')
                     // .on('change', 'tr', function () {

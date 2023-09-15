@@ -98,14 +98,11 @@ class FormulaCreateView (CreateView):
                     formula.cod_user = formuls['cod_user']
                     formula.save()
                     for i in formuls['activos']:
-                        detformu = DetFormula()
-                        detformu.formula = formula.id
-                        detformu.activos = i['cod_inven']
-                        detformu.cant = int(i['cant'])
-                        detformu.dosis = int(i['dosis'])
-                        detformu.posologia = int(i['posologia'])
-                        detformu.date_joined = i['date_joined']
-                        detformu.obs = i['obs']
+                        detformu = ActivosFormulas()
+                        detformu.codigoOdoo = i['cod_inven']
+                        detformu.activo = i['descripcion']
+                        detformu.cantidad = int(i['cant'])
+                        detformu.unidad = i['unidad']
                         detformu.save()
             else:
                 data['error'] = 'No ha ingresado a ninguna opcion'
@@ -131,7 +128,24 @@ class PedidoListView (ListView):
         context['title'] = 'Test'
         
         return context
-  
     
+class ActivosFormulasAdd(CreateView):
+    model = ActivosFormulas
+    form_class = ActivosFormulasForm
+    template_name = 'create_formu.html'
     
+    @method_decorator(csrf_exempt)
+    
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
+    
+    def form_valid(self, form):
+        # Handle the form submission and save the data
+        activos = form.save(commit=False)
+        activos.save()
+        return JsonResponse({'message': 'Cotización guardada con éxito'})
 
+    def form_invalid(self, form):
+        # Handle the case where the form is invalid
+        return JsonResponse({'message': 'Método no permitido'})
+    
