@@ -17,30 +17,38 @@
 
 
   <style>
-    .navbar-gradient{
-      background: #020024;
-      background: linear-gradient(181deg, rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 66%, rgba(0, 212, 255, 1) 100%);
-    }
-    .navbar-gradient .nav-link{
-        color:#fff; !important;
-    }
-    .navbar-gradient .navbar-brand,
-    .navbar-gradient .dropdown-item{
-      color: #0f0f00; !important;
-    }
-    .navbar-gradient .dropdown-menu{
-      
-      border: none;
-      box-shadow: 0 10px 25px rgba(0,0,0,.12);
-    }
-    .avatar-initial{
-      width:32px;height:32px;border-radius:50%;
-      display:inline-flex;align-items:center;justify-content:center;
-      background: #020024;
-      background: linear-gradient(181deg, rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 66%, rgba(0, 212, 255, 1) 100%);
-      font-weight:600;
-    }
-  </style>
+  .navbar-gradient {
+    background: #000000;
+    background: linear-gradient(135deg, #000000 0%, #4b4b00 40%, #ffd700 100%);
+  }
+
+  .navbar-gradient .nav-link {
+    color: #fff !important;
+    transition: color .2s ease;
+  }
+  .navbar-gradient .nav-link:hover {
+    color: #ffd700 !important;
+  }
+
+  .navbar-gradient .navbar-brand,
+  .navbar-gradient .dropdown-item {
+    color: #fff !important;
+  }
+
+  .navbar-gradient .dropdown-menu {
+    border: none;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, .3);
+  }
+
+  .avatar-initial {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #000000 0%, #4b4b00 40%, #ffd700 100%);
+    font-weight: 600;
+    color: #fff;
+  }
+</style>
+
 
   @stack('head')
 </head>

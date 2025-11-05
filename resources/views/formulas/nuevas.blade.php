@@ -61,14 +61,11 @@
 
         {{-- === Total + Botones de cotización === --}}
         <div class="row align-items-center mt-3">
-          <div class="col-lg-8">
+          <div class="col-lg-10">
             <h5 id="total" class="mb-0">Total: 0.00 mg</h5>
           </div>
-          <div class="col-lg-2 text-end">
-            <button type="button" id="btnSobres" class="btn btn-info w-100">Cotizar en Sobres</button>
-          </div>
           <div class="col-lg-2">
-            <button type="button" id="btnCapsulas" class="btn btn-success w-100">Cotizar en Cápsulas</button>
+            <button type="button" id="btnCapsulas" class="btn btn-success w-100">Cotizar</button>
           </div>
         </div>
         {{-- === /Total + Botones === --}}
