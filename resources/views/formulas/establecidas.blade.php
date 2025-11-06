@@ -37,7 +37,6 @@
         <thead>
           <tr>
             <th>Nombre Fórmula</th>
-            <th style="width:260px">Tipo Etiqueta</th>
             <th>Acciones</th>
             <th>P Médico</th>
             <th>P Distribuidor</th>
@@ -52,13 +51,7 @@
                 <div class="fw-semibold">{{ $r->codigo }}</div>
                 <small class="text-muted">{{ $r->nombre_etiqueta }}</small>
               </td>
-              <td>
-                <select class="form-select form-select-sm sel-tipo">
-                  @foreach($tipos as $t)
-                    <option value="{{ $t }}" {{ $r->tipo === $t ? 'selected' : '' }}>{{ $t }}</option>
-                  @endforeach
-                </select>
-              </td>
+              
               <td class="text-nowrap">
                 <a class="btn btn-secondary btn-sm" href="{{ route('fe.print',$r->id) }}" target="_blank" title="Imprimir">
                   <i class="bi bi-printer"></i>

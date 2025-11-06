@@ -9,35 +9,39 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse; 
 
-
 class FormulasEstController extends Controller
 {
     private const SESSION_KEY = 'fe_items';
-    private const TIPO_ETIQUETA = [
-        'Seleccionar','Dr Redin','Dr Li','Dr Walter','Dra Maria Delia',
-        'Dra Viteri','Dra Bernarda','M Urdiales','Naturmed','Sobre'
-    ];
+
+    // Códigos (nuevos) a excluir de composición / llevar al final
+    private const NEW_END_CODES = [3739, 3743, 3744, 3742, 3740]; // cápsula, pastillero, tapa, linner, etiqueta
+    // Códigos (antiguos) mantenidos por compatibilidad
+    private const OLD_END_CODES = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
 
     public function index(Request $request)
     {
-        $items = $request->session()->get(self::SESSION_KEY, []); // [['id'=>1,'tipo'=>null], ...]
+        // La sesión solo guarda IDs (sin “tipo”)
+        $items = $request->session()->get(self::SESSION_KEY, []); // [['id'=>1], ...]
         $ids   = array_column($items, 'id');
 
         $formulas = $ids ? Formula::whereIn('id',$ids)
             ->get(['id','codigo','nombre_etiqueta','precio_medico','precio_publico','precio_distribuidor']) : collect();
 
-        $rows = $formulas->map(function($f) use ($items){
-            $tipo = collect($items)->firstWhere('id',$f->id)['tipo'] ?? null;
+        // Enviamos “tipo” siempre null para no romper la vista (si lo usa)
+        $rows = $formulas->map(function($f){
             return (object)[
-                'id'=>$f->id,'codigo'=>$f->codigo,'nombre_etiqueta'=>$f->nombre_etiqueta,
-                'precio_medico'=>(float)$f->precio_medico,
-                'precio_distribuidor'=>(float)$f->precio_distribuidor,
-                'precio_publico'=>(float)$f->precio_publico,
-                'tipo'=>$tipo
+                'id'                 => $f->id,
+                'codigo'             => $f->codigo,
+                'nombre_etiqueta'    => $f->nombre_etiqueta,
+                'precio_medico'      => (float)$f->precio_medico,
+                'precio_distribuidor'=> (float)$f->precio_distribuidor,
+                'precio_publico'     => (float)$f->precio_publico,
+                'tipo'               => null,
             ];
         });
 
-        return view('formulas.establecidas', ['rows'=>$rows, 'tipos'=>self::TIPO_ETIQUETA]);
+        // Ya no hay lista de tipos; pasamos arreglo vacío para que el frontend no muestre selector
+        return view('formulas.establecidas', ['rows'=>$rows, 'tipos'=>[]]);
     }
 
     public function buscar(Request $request)
@@ -60,29 +64,17 @@ class FormulasEstController extends Controller
         $request->validate(['formula_id'=>'required|integer|exists:formulas,id']);
         $items = $request->session()->get(self::SESSION_KEY, []);
         if (!collect($items)->firstWhere('id',(int)$request->formula_id)) {
-            $items[] = ['id'=>(int)$request->formula_id, 'tipo'=>null];
+            $items[] = ['id'=>(int)$request->formula_id]; // sin 'tipo'
             $request->session()->put(self::SESSION_KEY,$items);
         }
         return back();
     }
 
+    // Ya no se usa: lo dejamos como NO-OP por compatibilidad con el frontend
     public function updateTipo(Request $request)
     {
-        $id   = (int) $request->input('formula_id');
-        $tipo = trim((string)$request->input('tipo'));
-
-        $items = $request->session()->get(self::SESSION_KEY, []);
-        foreach ($items as &$it) {
-            if ((int)$it['id'] === $id) {
-                $it['tipo'] = $tipo;
-                break;
-            }
-        }
-        $request->session()->put(self::SESSION_KEY, $items);
-
-        return response()->noContent();
+        return response()->noContent(); // 204
     }
-
 
     public function remove(Request $request,int $id)
     {
@@ -103,38 +95,16 @@ class FormulasEstController extends Controller
         // 1) Obtiene la fórmula e ítems
         $formula = \App\Models\Formula::with('items')->findOrFail($id);
 
-        // Ítems de composición: excluimos cápsulas, estearato, pastilleros, sobres, etc.
-        $excluir = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
+        // Ítems de composición: excluimos cápsulas/pastilleros/insumos y (por compat.) códigos antiguos
+        $excluir = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
         $itemsComposicion = $formula->items
             ->filter(fn($it) => !in_array((int)$it->cod_odoo, $excluir))
             ->values();
 
-        // QF fijo (igual que tu script). Si lo quieres dinámico, agrégalo a BD.
-        $qf = 'Q.F. EVELYN GARCÍA';
+        // QF fijo (si lo quieres dinámico, llévalo a BD)
+        $qf = 'Q.F. Jose Perez';
 
-        // 2) Recupera el tipo seleccionado desde la sesión fe_items
-        $feItems = $request->session()->get(self::SESSION_KEY, []); // [['id'=>1,'tipo'=>'Dr Redin'], ...]
-        $registro = collect($feItems)->firstWhere('id', $id);
-        $tipo = $registro['tipo'] ?? null;
-
-        // 3) Mapa Tipo -> nombre de vista
-        $map = [
-            'Seleccionar'   => null,
-            'Dr Redin'      => 'redin',
-            'Dr Li'         => 'li',
-            'Dr Walter'     => 'walter',
-            'Dra Maria Delia'=> 'maria_delia',
-            'Dra Viteri'    => 'viteri',
-            'Dra Bernarda'  => 'bernarda',
-            'M Urdiales'    => 'urdiales',
-            'Naturmed'      => 'naturmed',
-            'Sobre'         => 'sobre',
-        ];
-
-        $slug = $map[$tipo] ?? null;
-        $view = $slug ? "etiquetas.$slug" : "etiquetas.generica"; // fallback a "etiqueta a secas"
-
-        // 4) Renderiza la vista elegida
+        // 2) Siempre usamos la vista por defecto (generica)
         return view('etiquetas.generica', [
             'formula'           => $formula,
             'items'             => $itemsComposicion,
@@ -143,7 +113,6 @@ class FormulasEstController extends Controller
         ]);
     }
 
-
     public function excel(Request $request,int $id)
     {
         $f = Formula::findOrFail($id,['codigo','nombre_etiqueta','precio_medico','precio_publico','precio_distribuidor']);
@@ -151,7 +120,7 @@ class FormulasEstController extends Controller
         $csv.= "{$f->codigo},\"{$f->nombre_etiqueta}\",{$f->precio_medico},{$f->precio_distribuidor},{$f->precio_publico}\n";
         return response($csv,200,[
             'Content-Type'=>'text/csv; charset=UTF-8',
-            'Content-Disposition'=>'attachment; filename="formula_'.$f->codigo.'.csv"',
+            'Content-Disposition'=>'attachment; filename=\"formula_{$f->codigo}.csv\"',
         ]);
     }
 
@@ -159,7 +128,7 @@ class FormulasEstController extends Controller
     {
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta']);
 
-        $endCodes = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
+        $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
 
         $items = FormulaItem::where('codigo', $f->codigo)
             ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
@@ -172,33 +141,11 @@ class FormulasEstController extends Controller
         ]);
     }
 
-
-    // Exportar esos items a CSV
-    // public function itemsExport(int $id)
-    // {
-    //     $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta']);
-
-    //     $rows = FormulaItem::where('codigo', $f->codigo)
-    //         ->orderBy('id','desc')
-    //         ->get(['cod_odoo','activo','cantidad','unidad']);
-
-    //     $csv  = "Codigo,\"Nombre Etiqueta\",cod_odoo,activo,cantidad,unidad\n";
-    //     foreach ($rows as $r) {
-    //         $cantidad = rtrim(rtrim(number_format((float)$r->cantidad, 6, '.', ''), '0'), '.');
-    //         $csv .= "{$f->codigo},\"{$f->nombre_etiqueta}\",{$r->cod_odoo},\"{$r->activo}\",{$cantidad},{$r->unidad}\n";
-    //     }
-
-    //     return response($csv, 200, [
-    //         'Content-Type'        => 'text/csv; charset=UTF-8',
-    //         'Content-Disposition' => 'attachment; filename="items_'.$f->codigo.'.csv"',
-    //     ]);
-    // }
-
     public function itemsExportXlsx(int $id)
     {
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta']);
 
-        $endCodes = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
+        $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
 
         $rows = FormulaItem::where('codigo', $f->codigo)
             ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
@@ -252,7 +199,6 @@ class FormulasEstController extends Controller
 
         $filename = 'export_odoo_'.$f->codigo.'.xlsx';
 
-        // StreamedResponse para no escribir en disco
         return new StreamedResponse(function () use ($spreadsheet) {
             $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
