@@ -13,29 +13,26 @@
   <script src="https://code.jquery.com/ui/1.13.3/jquery-ui.min.js"></script>
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.3/themes/base/jquery-ui.css">
 
-  
-
-
   <style>
-  .navbar-gradient {
+  .sidebar {
     background: #000000;
     background: linear-gradient(135deg, #000000 0%, #4b4b00 40%, #ffd700 100%);
   }
 
-  .navbar-gradient .nav-link {
+  .sidebar .nav-link {
     color: #fff !important;
     transition: color .2s ease;
   }
-  .navbar-gradient .nav-link:hover {
+  .sidebar .nav-link:hover {
     color: #ffd700 !important;
   }
 
-  .navbar-gradient .navbar-brand,
-  .navbar-gradient .dropdown-item {
+  .sidebar .sidebar-brand,
+  .sidebar .dropdown-item {
     color: #fff !important;
   }
 
-  .navbar-gradient .dropdown-menu {
+  .sidebar .dropdown-menu {
     border: none;
     box-shadow: 0 10px 25px rgba(0, 0, 0, .3);
   }
@@ -46,6 +43,17 @@
     background: linear-gradient(135deg, #000000 0%, #4b4b00 40%, #ffd700 100%);
     font-weight: 600;
     color: #fff;
+  }
+   body {
+    background-color: #f2f2f2; /* gris suave */
+  }
+
+  /* Opcional: si quieres que el main tenga un pequeño contraste */
+  main.container {
+    background-color: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
   }
 </style>
 

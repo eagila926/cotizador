@@ -13,12 +13,12 @@
 </style>
 @endpush
 
-@section('title', 'Inicio | Ortomed')
+@section('title', 'Inicio')
 
 @section('content')
   <div class="card">
     <div class="card-body">
-      <h5 class="card-title mb-2">Ingrese los activos de la formula</h5>
+      <h5 class="card-title mb-2">Ingrese los activos de la fórmula</h5>
       <div class="row">
         <div class="col-lg-12">
           <form>
@@ -52,11 +52,6 @@
 
         <div class="col-lg-12">
           <button type="button" id="btnAdd" class="btn btn-primary" onclick="agregarFila();">Añadir</button>
-        </div>
-
-        <!-- Aviso límite -->
-        <div class="col-12 mt-2">
-          <div id="alertLimite" class="alert alert-warning py-2 px-3 d-none" role="alert"></div>
         </div>
 
         {{-- === Total + Botones de cotización === --}}
@@ -99,7 +94,7 @@
     </div>
   </div>
 @endsection
-{{-- Asegúrate de tener en tu layout: <meta name="csrf-token" content="{{ csrf_token() }}"> --}}
+
 @push('scripts')
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -121,27 +116,24 @@
       $('.suggest-element').off('click').on('click', function () {
         const cod    = $(this).data('cod_odoo');
         const nombre = $(this).text();
-        // lee como número (puede venir "null" o vacío)
+
+        // Lee valores para mostrar (compatibilidad con catálogos antiguos)
         const minRaw = $(this).data('minimo');
         const maxRaw = $(this).data('maximo');
         const minNum = (minRaw === '' || minRaw === null || isNaN(Number(minRaw))) ? null : Number(minRaw);
         const maxNum = (maxRaw === '' || maxRaw === null || isNaN(Number(maxRaw))) ? null : Number(maxRaw);
-
         const unidad = (($(this).data('unidad') || 'mg') + '').trim();
 
         $('#activo').val(nombre).data('cod_odoo', cod);
 
-        // helper para mostrar número + unidad o "—"
         const fmtUM = (v, u) => (v === null ? '—' : `${v} ${u}`);
-
-        // etiqueta + límites numéricos del input
         $('#minMaxLabel').text(`Mínimo: ${fmtUM(minNum, unidad)} ; Máximo: ${fmtUM(maxNum, unidad)}`);
+
         $('#cant')
           .attr('min', minNum === null ? '' : minNum)
           .attr('max', maxNum === null ? '' : maxNum)
           .attr('step', unidad === 'mcg' ? 1 : (unidad === 'mg' ? 0.01 : 1));
 
-        // fija la UNIDAD en el select y lo bloquea
         $('#unidad')
           .html(`<option value="${unidad}" selected>${unidad}</option>`)
           .prop('disabled', true);
@@ -152,8 +144,6 @@
     });
   }
 
-
-
   // Listar tabla
   function mostrarActivos() {
     $.get("{{ route('formulas.listar') }}", function (html) {
@@ -161,13 +151,8 @@
     });
   }
 
-  // Agregar a temp
+  // Agregar a temp (sin restricción de cantidad de filas)
   function agregarFila() {
-    if ($('#btnAdd').prop('disabled')) {
-      alert('Has alcanzado el máximo de 15 activos.');
-      return;
-    }
-    
     const activo  = $('#activo').val();
     const codOdoo = $('#activo').data('cod_odoo');
     const cant    = $('#cant').val();
@@ -177,14 +162,6 @@
       alert('Por favor, complete todos los campos.');
       return;
     }
-
-    // validación rápida cliente contra max/min
-    // Lee min/max solo para armar el contexto del aviso (NO bloquea)
-    const minAttr = $('#cant').attr('min');
-    const maxAttr = $('#cant').attr('max');
-    const min = (minAttr === undefined || minAttr === '') ? null : parseFloat(minAttr);
-    const max = (maxAttr === undefined || maxAttr === '') ? null : parseFloat(maxAttr);
-    const c   = parseFloat(cant);
 
     $.post("{{ route('formulas.agregar') }}", {
       activo: activo, cod_odoo: codOdoo, cantidad: cant, unidad: unidad
@@ -196,29 +173,19 @@
 
       if (typeof data === 'object' && data !== null) {
         if (data.status === 'ok') {
-          // limpia
+          // limpiar inputs
           $('#activo').val('').data('cod_odoo','');
           $('#cant').val('').removeAttr('min').removeAttr('max').removeAttr('step');
           $('#unidad').html('').prop('disabled', false);
           $('#minMaxLabel').text('Mínimo: ; Máximo: ');
           mostrarActivos();
-
-          // ⚠️ Avisos si fuera de rango
-          if (Array.isArray(data.warnings) && data.warnings.length) {
-            showRangeWarning(data.warnings, {
-              min, max, cant: c, unidad
-            });
-          }
           return;
         }
-        if (data.status === 'duplicado')     return alert('Este activo ya ha sido ingresado.');
+        if (data.status === 'duplicado')       return alert('Este activo ya ha sido ingresado.');
         if (data.status === 'UNIDAD_INVALIDA') return alert('Unidad no permitida para este activo.');
-        if (data.status === 'LIMITE_SUPERADO') return alert('Ya alcanzaste el máximo de 15 activos.');
-
         return alert('Error al guardar: ' + JSON.stringify(data));
       }
 
-      // Compatibilidad si te llega string
       const r = (res + '').trim();
       if (r === 'ok') {
         $('#activo').val('').data('cod_odoo','');
@@ -230,8 +197,6 @@
         alert('Este activo ya ha sido ingresado.');
       } else if (r === 'UNIDAD_INVALIDA') {
         alert('Unidad no permitida para este activo.');
-      } else if (r === 'LIMITE_SUPERADO') {
-        alert('Ya alcanzaste el máximo de 15 activos.');
       } else {
         alert('Error al guardar: ' + r);
       }
@@ -239,47 +204,7 @@
 
   }
 
-  function showRangeWarning(warnings, ctx, ms = 6000) {
-    const { min, max, cant, unidad } = ctx;
-    const msgs = [];
-
-    if (Array.isArray(warnings) && warnings.includes('BAJO_MIN') && min !== null) {
-      msgs.push(`⚠️ La cantidad ingresada (${cant} ${unidad}) está por <b>debajo</b> del mínimo (${min} ${unidad}).`);
-    }
-    if (Array.isArray(warnings) && warnings.includes('SOBRE_MAX') && max !== null) {
-      msgs.push(`⚠️ La cantidad ingresada (${cant} ${unidad}) está por <b>encima</b> del máximo (${max} ${unidad}).`);
-    }
-    if (!msgs.length) return;
-
-    const $alert = $('#alertLimite');
-
-    // Marca como "activa" y limpia cualquier timer previo
-    window.__rangeWarnActive && clearTimeout(window.__rangeWarnTimer);
-    window.__rangeWarnActive = true;
-
-    // Sello para evitar carreras (si llega otro aviso más nuevo)
-    const stamp = Date.now();
-    $alert.data('stamp', stamp);
-
-    // Mostrar
-    $alert
-      .removeClass('d-none alert-danger')
-      .addClass('alert-warning')
-      .html(msgs.join('<br>'));
-
-    // Ocultar solo cuando el sello coincide (sigue siendo el aviso vigente)
-    window.__rangeWarnTimer = setTimeout(() => {
-      // si otro aviso llegó después, no cierres este
-      if ($alert.data('stamp') !== stamp) return;
-
-      window.__rangeWarnActive = false;
-      $alert.addClass('d-none').empty();
-    }, ms);
-  }
-
-
-
-  // Eliminar una fila (lo llama el botón que viene en el HTML de listar)
+  // Eliminar una fila
   function eliminarFila(id) {
     if (!confirm('¿Estás seguro de eliminar este activo?')) return;
     $.post("{{ route('formulas.eliminar') }}", { id: id }, function (res) {
@@ -287,7 +212,7 @@
       else alert('Error al eliminar: ' + res);
     });
   }
-  window.eliminarFila = eliminarFila; // expone la función para los botones inline
+  window.eliminarFila = eliminarFila;
 
   // Eliminar todos
   function eliminarTodosLosActivos() {
@@ -302,18 +227,14 @@
   // Cargar al entrar
   document.addEventListener('DOMContentLoaded', mostrarActivos);
 
-
-  // === TOTAL EN MG + REGLAS DE BOTONES ===
-    function verificarCondiciones() {
+  // === TOTAL EN MG (sin límites ni bloqueos) ===
+  function verificarCondiciones() {
     $.get("{{ route('formulas.listar') }}?json=1", function (activos) {
       const codigosProhibidos = [4520, 1205, 1044, 1086, 70136, 1163];
       let totalMg = 0;
       let contieneProhibido = false;
 
-      // === NUEVO: conteo de activos ===
-      const n = Array.isArray(activos) ? activos.length : 0;
-
-      activos.forEach(item => {
+      (Array.isArray(activos) ? activos : []).forEach(item => {
         const cantidad = parseFloat(item.cantidad);
         const unidad   = item.unidad;
         const codOdoo  = parseInt(item.cod_odoo);
@@ -322,8 +243,9 @@
         switch (unidad) {
           case 'mg':  cantidadMg = cantidad;        break;
           case 'mcg': cantidadMg = cantidad / 1000; break;
-          case 'UI':  cantidadMg = (codOdoo === 1343) ? (cantidad * 0.000025 / 1000)
-                                                      : (cantidad * 0.00067);
+          case 'UI':  cantidadMg = (codOdoo === 1343)
+                      ? (cantidad * 0.000025 / 1000)
+                      : (cantidad * 0.00067);
                       break;
           default:    cantidadMg = 0;
         }
@@ -336,70 +258,31 @@
       const $total = $('#total');
       if ($total.length) $total.text(`Total: ${totalMg.toFixed(2)} mg`);
 
-      // Regla sobres
+      // (Opcional) Si usas botón de sobres en otro layout
       const $btnSobres = $('#btnSobres');
       if ($btnSobres.length) $btnSobres.prop('disabled', contieneProhibido || totalMg < 2499);
 
-      // === NUEVO: aviso visual y bloqueo por cantidad ===
-      const $tabla = $('#tablaFormula');
-      const $alert = $('#alertLimite');
-      const $btnAdd = $('#btnAdd');
-
-      // Quita estilos previos
-      $tabla.removeClass('table-warning');
-
-      // ❗ No ocultes el alert si hay un aviso de rango activo
-      if (!window.__rangeWarnActive) {
-        $alert.addClass('d-none').text('');
-      }
-      $btnAdd.prop('disabled', false);
-
-
-      if (n >= 10 && n < 15) {
-        // aviso naranja y pintar tabla
-        $alert
-          .removeClass('d-none')
-          .text(`Llevas ${n} activos. El máximo permitido es 15.`);
-        $tabla.addClass('table-warning'); // pinta la tabla (naranja suave)
-      } else if (n >= 15) {
-        // bloquear agregar
-        $alert
-          .removeClass('d-none')
-          .text('Has alcanzado el máximo de 15 activos. El botón "Añadir" se ha bloqueado.');
-        $btnAdd.prop('disabled', true);
-        $tabla.addClass('table-warning');
-      }
-
-      // Guarda total si lo necesitas
       localStorage.setItem('totalMg', totalMg.toFixed(2));
     });
   }
 
-    // Llama verificarCondiciones cada vez que recargas la tabla
-    const __oldMostrarActivos = mostrarActivos;
-    window.mostrarActivos = function() {
+  // Llama verificarCondiciones cada vez que recargas la tabla
+  const __oldMostrarActivos = mostrarActivos;
+  window.mostrarActivos = function() {
     __oldMostrarActivos();
-    // Espera a que el HTML llegue y luego verifica (pequeño delay para asegurar el render)
     setTimeout(verificarCondiciones, 120);
-    };
+  };
 
-    // También al cargar por primera vez
-    document.addEventListener('DOMContentLoaded', function () {
+  // También al cargar por primera vez
+  document.addEventListener('DOMContentLoaded', function () {
     setTimeout(verificarCondiciones, 200);
-    });
+  });
 
-    // === REDIRECCIONES A RESÚMENES ===
-    $('#btnCapsulas').on('click', function() {
-    // puedes guardar días de tratamiento si lo usas:
+  // === REDIRECCIÓN A RESUMEN DE CÁPSULAS ===
+  $('#btnCapsulas').on('click', function() {
     const dias = $('#diasTratamiento').val() || 30;
     localStorage.setItem('diasTratamiento', dias);
     window.location.href = "{{ route('formulas.resumen_capsulas') }}";
-    });
-
-    $('#btnSobres').on('click', function() {
-    const dias = $('#diasTratamiento').val() || 30;
-    localStorage.setItem('diasTratamiento', dias);
-    window.location.href = "{{ route('formulas.resumen_sobres') }}";
-    });
+  });
 </script>
 @endpush

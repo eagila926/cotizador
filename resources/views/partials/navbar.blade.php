@@ -58,7 +58,8 @@
     top: 0; left: 0;
     width: 240px;
     height: 100vh;
-    background: linear-gradient(180deg,#0d6efd,#198754);
+    background: #157d33;
+    background: linear-gradient(90deg,rgba(21, 125, 51, 1) 0%, rgba(9, 121, 24, 1) 35%, rgba(0, 68, 82, 1) 100%);
   }
   .sidebar .brand-logo {
     height: 40px;
@@ -73,7 +74,11 @@
     border-radius: .5rem;
   }
   .avatar-initial {
-    width: 36px; height: 36px; border-radius: 50%;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #000000 0%, #4b4b00 40%, #ffd700 100%);
+    font-weight: 600;
+    color: #fff;width: 36px; height: 36px; border-radius: 50%;
     background: #0d6efd; display: grid; place-items: center;
     font-weight: bold; color: #fff;
   }

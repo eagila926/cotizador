@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title','Fórmulas Establecidas | Ortomed')
+@section('title','Fórmulas Establecidas')
 
 @section('content')
 <div class="card mb-3">

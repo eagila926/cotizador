@@ -164,7 +164,7 @@ class FormulaController extends Controller
         $mes    = now()->format('n'); // 1..12
         $random = random_int(100000, 999999); // 6 dígitos
 
-        return "FO{$iniciales}{$mes}.{$random}";
+        return "FORMU.{$random}";
     }
 
     private function toMgDia(float $cantidad, string $unidad, int $cod_odoo): float
