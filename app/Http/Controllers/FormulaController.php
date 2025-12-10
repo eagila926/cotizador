@@ -14,11 +14,11 @@ use Illuminate\Support\Str;
 class FormulaController extends Controller
 {
     // ===================== Constantes de negocio =====================
-    // Cápsula única de 550 mg
-    private const CAPS_MG_POR_UND = 550;
+    // Cápsula única de 475 mg
+    private const CAPS_MG_POR_UND = 475;
 
     // Códigos de inventario (ajústalos a tu catálogo real)
-    private const COD_CAPSULA_550 = 3739; // CÁPSULA 550 mg
+    private const COD_CAPSULA_475 = 3739; // CÁPSULA 475 mg
     private const COD_PASTILLERO  = 3743; // PASTILLERO
 
     // NUEVOS INSUMOS
@@ -196,7 +196,7 @@ class FormulaController extends Controller
         $cods = array_merge(
             $cods,
             [
-                self::COD_CAPSULA_550,
+                self::COD_CAPSULA_475,
                 self::COD_PASTILLERO,
                 self::COD_TAPA_SEG,
                 self::COD_LINNER,
@@ -243,12 +243,12 @@ class FormulaController extends Controller
 
         // Cápsulas (unidades/mes)
         $rows->push([
-            'cod_odoo'    => self::COD_CAPSULA_550,
-            'activo'      => $catalogo[self::COD_CAPSULA_550]->nombre ?? 'CÁPSULA 550 mg',
+            'cod_odoo'    => self::COD_CAPSULA_475,
+            'activo'      => $catalogo[self::COD_CAPSULA_475]->nombre ?? 'CÁPSULA 475 mg',
             'cantidad'    => $capsMes,
             'unidad'      => 'und',
             'mg_dia'      => null,
-            'valor_costo' => (float)($catalogo[self::COD_CAPSULA_550]->valor_costo ?? 0),
+            'valor_costo' => (float)($catalogo[self::COD_CAPSULA_475]->valor_costo ?? 0),
         ]);
 
         // Pastillero (unidades)
@@ -398,8 +398,8 @@ class FormulaController extends Controller
         $capsMes   = $capsDia * 30;
 
         $rows->push([
-            'cod_odoo'  => self::COD_CAPSULA_550,
-            'activo'    => 'CÁPSULA 550 mg',
+            'cod_odoo'  => self::COD_CAPSULA_475,
+            'activo'    => 'CÁPSULA 475 mg',
             'unidad'    => 'und',
             'cantidad'  => (float)$capsMes, // und/mes
             'masa_mes'  => null,
@@ -471,7 +471,7 @@ class FormulaController extends Controller
 
         // Excluir cápsulas, pastillero e insumos fijos de la carga a temporales
         $codsExcluir  = [
-            self::COD_CAPSULA_550,
+            self::COD_CAPSULA_475,
             self::COD_PASTILLERO,
             self::COD_TAPA_SEG,
             self::COD_LINNER,
@@ -522,7 +522,4 @@ class FormulaController extends Controller
             ->with('ok', 'Fórmula cargada para edición. Ajusta los activos y guarda.');
     }
 
-    // ===================== SECCIONES ELIMINADAS =====================
-    // - Estearato y sobres: eliminados
-    // - buscarMedico(): eliminado (médico es libre)
 }
