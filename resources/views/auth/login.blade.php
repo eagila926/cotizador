@@ -40,7 +40,7 @@
             </form>
           </div>
         </div>
-        <p class="text-center text-muted mt-3 mb-0 small">© Escollanos</p>
+        <p class="text-center text-muted mt-3 mb-0 small">© BIOPRODUCTOS</p>
       </div>
     </div>
   </div>
