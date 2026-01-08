@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
 
         // Exportar ítems a CSV
         Route::get('/{id}/items/export', [FormulasEstController::class,'itemsExportXlsx'])->name('items.export');
+        Route::post('/update-prices', [FormulasEstController::class, 'updatePrices'])->name('updatePrices');
 
     });
 

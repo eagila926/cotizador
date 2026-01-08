@@ -300,10 +300,8 @@ class FormulaController extends Controller
         ]);
     }
 
-    // ===================== Guardar Fórmula (solo cápsulas) =====================
     public function guardar(Request $request)
     {
-        // Campo médico abierto (sin regex)
         $request->validate([
             'cod_formula'           => ['required','string','max:30'],
             'nombre_etiqueta'       => ['nullable','string','max:150'],
@@ -318,17 +316,20 @@ class FormulaController extends Controller
         $userId = Auth::id();
         if (!$userId) abort(401);
 
-        // Siempre re-generamos el código del backend
-        $codigoBackend = $this->buildCodFormula();
+        // Usa el mismo código que viene del resumen (readonly)
+        $codigoBackend = (string) $request->input('cod_formula');
 
-        DB::transaction(function () use ($request, $userId, $codigoBackend) {
+        $formulaCreada = null;
 
-            // 1) Cabecera (los precios vienen de la vista)
+        DB::transaction(function () use ($request, $userId, $codigoBackend, &$formulaCreada) {
+
+            // Precios vienen desde la vista (hidden)
             $precio_medico       = max(0, (float)$request->input('precio_medico', 0));
             $precio_publico      = (float)$request->input('precio_publico', 0);
             $precio_distribuidor = (float)$request->input('precio_distribuidor', 0);
 
-            Formula::create([
+            // 1) Cabecera (capturamos la instancia para usar su ID)
+            $formulaCreada = Formula::create([
                 'codigo'              => $codigoBackend,
                 'nombre_etiqueta'     => $request->input('nombre_etiqueta'),
                 'user_id'             => $userId,
@@ -340,10 +341,10 @@ class FormulaController extends Controller
                 'tomas_diarias'       => (float)$request->input('tomas_diarias', 0),
             ]);
 
-            // 2) Calcular filas (activos + cápsulas + pastillero + nuevos insumos)
+            // 2) Calcular filas para items (activos + cápsulas + pastillero + insumos)
             $rows = $this->calcularFilasParaGuardarCapsulas($userId);
 
-            // 3) Insert masivo
+            // 3) Insert masivo en formulas_items
             $now = now();
             $insert = $rows->map(function ($r) use ($codigoBackend, $now) {
                 return [
@@ -351,8 +352,8 @@ class FormulaController extends Controller
                     'cod_odoo'   => (int)($r['cod_odoo'] ?? 0),
                     'activo'     => (string)($r['activo'] ?? ''),
                     'unidad'     => $r['unidad'] ?? null,
-                    'masa_mes'   => isset($r['masa_mes']) ? (float)$r['masa_mes'] : null, // g/mes si aplica
-                    'cantidad'   => isset($r['cantidad']) ? (float)$r['cantidad'] : null, // und/mes o por día referencial
+                    'masa_mes'   => array_key_exists('masa_mes', $r) ? (is_null($r['masa_mes']) ? null : (float)$r['masa_mes']) : null,
+                    'cantidad'   => array_key_exists('cantidad', $r) ? (is_null($r['cantidad']) ? null : (float)$r['cantidad']) : null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -362,12 +363,29 @@ class FormulaController extends Controller
                 FormulaItem::insert($insert);
             }
 
-            // 4) Limpiar temporales
+            // 4) Limpiar temporales del usuario
             ActivoTemp::where('user_id', $userId)->delete();
         });
 
-        return redirect()->route('formulas.nuevas')->with('ok', 'Fórmula guardada correctamente.');
+        // Seguridad por si algo inesperado ocurre
+        if (!$formulaCreada) {
+            return redirect()->route('formulas.nuevas')
+                ->with('ok', 'Fórmula guardada, pero no se pudo cargar en establecidas.');
+        }
+
+        // 5) Agregar automáticamente a la sesión "fe_items" para que aparezca en la tabla de establecidas
+        $items = $request->session()->get('fe_items', []); // misma llave que usa FormulasEstController
+        if (!collect($items)->firstWhere('id', (int)$formulaCreada->id)) {
+            $items[] = ['id' => (int)$formulaCreada->id];
+            $request->session()->put('fe_items', $items);
+        }
+
+        // 6) Redirigir a fórmulas establecidas (tu vista de tabla)
+        return redirect()
+            ->route('fe.index')
+            ->with('ok', 'Fórmula guardada y agregada a Fórmulas Establecidas.');
     }
+
 
     private function calcularFilasParaGuardarCapsulas(int $userId): \Illuminate\Support\Collection
     {

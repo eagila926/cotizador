@@ -7,7 +7,8 @@ use App\Models\Formula;
 use App\Models\FormulaItem;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse; 
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\Validator;
 
 class FormulasEstController extends Controller
 {
@@ -209,4 +210,25 @@ class FormulasEstController extends Controller
             'Pragma'              => 'public',
         ]);
     }
+
+    public function updatePrices(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required','integer','exists:formulas,id'],
+            'precio_medico'       => ['nullable','numeric','min:0'],
+            'precio_distribuidor' => ['nullable','numeric','min:0'],
+            'precio_publico'      => ['nullable','numeric','min:0'],
+        ]);
+
+        $f = Formula::findOrFail((int)$data['id']);
+
+        $f->precio_medico       = $data['precio_medico'] !== null ? round((float)$data['precio_medico'], 2) : $f->precio_medico;
+        $f->precio_distribuidor = $data['precio_distribuidor'] !== null ? round((float)$data['precio_distribuidor'], 2) : $f->precio_distribuidor;
+        $f->precio_publico      = $data['precio_publico'] !== null ? round((float)$data['precio_publico'], 2) : $f->precio_publico;
+
+        $f->save();
+
+        return response()->json(['ok' => true]);
+    }
+
 }

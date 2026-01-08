@@ -21,12 +21,12 @@
 
     <li>
       <a href="#submenuProduccion" data-bs-toggle="collapse" class="nav-link text-white dropdown-toggle {{ request()->routeIs('formulas.*') ? 'active' : '' }}">
-        <i class="bi bi-grid-3x3-gap me-2"></i>Producción
+        <i class="bi bi-grid-3x3-gap me-2"></i>Laboratorio
       </a>
       <ul class="collapse nav flex-column ms-3" id="submenuProduccion">
-        <li><a href="{{ route('fe.index') }}" class="nav-link text-white-50">Fórmulas Establecidas</a></li>
+        <li><a href="{{ route('fe.index') }}" class="nav-link text-white-50">Buscar Formulas</a></li>
         <li><a href="{{ route('formulas.nuevas') }}" class="nav-link text-white-50">Fórmulas Nuevas</a></li>
-        <li><a href="{{ route('formulas.recientes') }}" class="nav-link text-white-50">Fórmulas Recientes</a></li>
+        <li><a href="{{ route('formulas.recientes') }}" class="nav-link text-white-50">Fórmulas Del Usuario</a></li>
       </ul>
     </li>
   </ul>
