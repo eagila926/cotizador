@@ -15,7 +15,7 @@ class FormulasEstController extends Controller
     private const SESSION_KEY = 'fe_items';
 
     // Códigos (nuevos) a excluir de composición / llevar al final
-    private const NEW_END_CODES = [3739, 3743, 3744, 3742, 3740]; // cápsula, pastillero, tapa, linner, etiqueta
+    private const NEW_END_CODES = [3994, 3796, 3994, 3397, 3395]; // cápsula, pastillero, tapa, linner, etiqueta
     // Códigos (antiguos) mantenidos por compatibilidad
     private const OLD_END_CODES = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
 

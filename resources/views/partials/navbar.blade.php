@@ -7,10 +7,11 @@
 
 <div class="sidebar d-flex flex-column p-3 text-white shadow">
   <a href="{{ route('home') }}" class="d-flex align-items-center mb-3 mb-md-0 text-white text-decoration-none">
-    <img src="{{ asset('images/logo-dark.png') }}" alt="Logo" class="brand-logo me-2">
-    <span class="fs-5 fw-bold">Cotizador</span>
+    <img src="{{ asset('images/BioProductosLogo.jpg') }}" alt="Logo" class="brand-logo me-2"><br>
+    
   </a>
   <hr>
+  <span class="fs-5 fw-bold">Cotizador</span>
 
   <ul class="nav nav-pills flex-column mb-auto">
     <li class="nav-item">
