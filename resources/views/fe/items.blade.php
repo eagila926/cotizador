@@ -69,6 +69,15 @@
 
               // Unidad a mostrar:
               $unidadExport = $esMasa ? 'g' : ($it->unidad ?? '');
+
+              // Normalización de unidades no-masa
+              $unidadMap = [
+                'und' => 'Unidades',
+              ];
+
+              $unidadExport = $esMasa
+                  ? 'g'
+                  : ($unidadMap[$u] ?? ($it->unidad ?? ''));
             @endphp
             <tr>
               <td>{{ $it->cod_odoo }}</td>

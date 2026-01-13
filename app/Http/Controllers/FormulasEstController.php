@@ -173,25 +173,28 @@ class FormulasEstController extends Controller
         $r = 2;
         foreach ($rows as $it) {
             $u = strtolower((string)$it->unidad);
-            $esMasa = in_array($u, ['mg','mcg','ui','g']);
+            $esMasa = in_array($u, ['mg','mcg','ui','g'], true);
 
             $cantidadExport = $esMasa
-                ? (float)($it->masa_mes ?? 0)   // g/mes
-                : (float)($it->cantidad ?? 0);  // ej. und
+                ? (float)($it->masa_mes ?? 0)
+                : (float)($it->cantidad ?? 0);
 
-            $unidadExport = $esMasa ? 'g' : ($it->unidad ?? '');
+            $unidadMap = [
+                'und' => 'Unidades',
+            ];
+
+            $unidadExport = $esMasa
+                ? 'g'
+                : ($unidadMap[$u] ?? ($it->unidad ?? ''));
 
             $sheet->setCellValue("A{$r}", (int)$it->cod_odoo);
             $sheet->setCellValue("B{$r}", $cantidadExport);
             $sheet->setCellValue("C{$r}", $unidadExport);
 
-            // 4 decimales para Cantidad
-            $sheet->getStyle("B{$r}")
-                ->getNumberFormat()
-                ->setFormatCode('0.0000');
-
+            $sheet->getStyle("B{$r}")->getNumberFormat()->setFormatCode('0.0000');
             $r++;
         }
+
 
         // Auto-size columnas
         foreach (range('A','C') as $col) {
