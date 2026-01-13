@@ -50,7 +50,7 @@
         <tr>
           <th>Líneas de LdM/Componente/Id. de la BD</th>
           <th>Líneas de LdM/Cantidad</th>
-          <th>Líneas de LdM/Unidad de medida del producto/ID</th>
+          <th>Líneas de lista de materiales/Unidad de medida del producto</th>
         </tr>
         </thead>
         <tbody>

@@ -7,7 +7,7 @@
 
 <div class="sidebar d-flex flex-column p-3 text-white shadow">
   <a href="{{ route('home') }}" class="d-flex align-items-center mb-3 mb-md-0 text-white text-decoration-none">
-    <img src="{{ asset('images/BioProductosLogo.jpg') }}" alt="Logo" class="brand-logo me-2"><br>
+    <img style="border-radius:10px"src="{{ asset('images/BioProductosLogo.jpg') }}" alt="Logo" class="brand-logo me-2"><br>
     
   </a>
   <hr>
@@ -30,6 +30,24 @@
         <li><a href="{{ route('formulas.recientes') }}" class="nav-link text-white-50">Fórmulas Del Usuario</a></li>
       </ul>
     </li>
+
+    <li>
+      <a href="#submenuUsuarios"
+        data-bs-toggle="collapse"
+        class="nav-link text-white dropdown-toggle {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
+        <i class="bi bi-people me-2"></i>Usuarios
+      </a>
+
+      <ul class="collapse nav flex-column ms-3" id="submenuUsuarios">
+        <li>
+          <a href="{{ route('usuarios.create') }}"
+            class="nav-link text-white-50 {{ request()->routeIs('usuarios.create') ? 'active' : '' }}">
+            <i class="bi bi-person-plus me-2"></i>Crear usuario
+          </a>
+        </li>
+      </ul>
+    </li>
+
   </ul>
 
   <hr>

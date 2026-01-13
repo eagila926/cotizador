@@ -162,7 +162,7 @@ class FormulasEstController extends Controller
         $headers = [
             'A1' => 'Líneas de LdM/Componente/Id. de la BD',
             'B1' => 'Líneas de LdM/Cantidad',
-            'C1' => 'Líneas de LdM/Unidad de medida del producto/ID',
+            'C1' => 'Líneas de lista de materiales/Unidad de medida del producto',
         ];
         foreach ($headers as $col => $text) {
             $sheet->setCellValue($col, $text);
