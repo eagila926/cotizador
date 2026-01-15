@@ -30,20 +30,6 @@ Route::middleware('auth')->group(function () {
     
     Route::get('/usuarios/crear', [UserController::class, 'create'])->name('usuarios.create');
     Route::post('/usuarios', [UserController::class, 'store'])->name('usuarios.store');
-    Route::get('/buscar-medico', [FormulaController::class, 'buscarMedico'])->name('medicos.buscar');
-
-    Route::get('/medicos/buscar', [MedicoController::class, 'buscar'])
-    ->name('medicos.buscar');
-
-    Route::post('/recetas', [RecetaController::class, 'storeMultiple'])->name('recetas.store');
-    Route::get('/recetas/{receta}/enviar-mail', [RecetaController::class, 'testEnviarMail'])->name('recetas.testMail');
-    // Listado de recetas (todas, con paginación)
-    Route::get('/recetas', [RecetaController::class, 'index'])->name('recetas.index');
-
-    // (opcional) detalle de una receta
-    Route::get('/recetas/{receta}', [RecetaController::class, 'show'])
-        ->whereNumber('receta')
-        ->name('recetas.show');
     
     Route::prefix('formulas')->name('formulas.')->group(function () {
 

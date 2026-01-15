@@ -1,15 +1,19 @@
 @php
   use Illuminate\Support\Facades\Auth;
+
   $user = Auth::user();
   $fullName = $user ? trim($user->nombre.' '.$user->apellido) : 'Usuario';
   $initials = strtoupper(mb_substr($user?->nombre ?? 'U',0,1));
+
+  // === Rol ===
+  $isAdmin = $user && strtoupper((string)($user->rol ?? '')) === 'ADMIN';
 @endphp
 
 <div class="sidebar d-flex flex-column p-3 text-white shadow">
   <a href="{{ route('home') }}" class="d-flex align-items-center mb-3 mb-md-0 text-white text-decoration-none">
-    <img style="border-radius:10px"src="{{ asset('images/BioProductosLogo.jpg') }}" alt="Logo" class="brand-logo me-2"><br>
-    
+    <img style="border-radius:10px" src="{{ asset('images/BioProductosLogo.jpg') }}" alt="Logo" class="brand-logo me-2"><br>
   </a>
+
   <hr>
   <span class="fs-5 fw-bold">Cotizador</span>
 
@@ -21,7 +25,8 @@
     </li>
 
     <li>
-      <a href="#submenuProduccion" data-bs-toggle="collapse" class="nav-link text-white dropdown-toggle {{ request()->routeIs('formulas.*') ? 'active' : '' }}">
+      <a href="#submenuProduccion" data-bs-toggle="collapse"
+         class="nav-link text-white dropdown-toggle {{ request()->routeIs('formulas.*') ? 'active' : '' }}">
         <i class="bi bi-grid-3x3-gap me-2"></i>Laboratorio
       </a>
       <ul class="collapse nav flex-column ms-3" id="submenuProduccion">
@@ -31,22 +36,25 @@
       </ul>
     </li>
 
+    {{-- === USUARIOS: SOLO ADMIN === --}}
+    @if($isAdmin)
     <li>
       <a href="#submenuUsuarios"
-        data-bs-toggle="collapse"
-        class="nav-link text-white dropdown-toggle {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
+         data-bs-toggle="collapse"
+         class="nav-link text-white dropdown-toggle {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
         <i class="bi bi-people me-2"></i>Usuarios
       </a>
 
       <ul class="collapse nav flex-column ms-3" id="submenuUsuarios">
         <li>
           <a href="{{ route('usuarios.create') }}"
-            class="nav-link text-white-50 {{ request()->routeIs('usuarios.create') ? 'active' : '' }}">
+             class="nav-link text-white-50 {{ request()->routeIs('usuarios.create') ? 'active' : '' }}">
             <i class="bi bi-person-plus me-2"></i>Crear usuario
           </a>
         </li>
       </ul>
     </li>
+    @endif
 
   </ul>
 
@@ -97,9 +105,13 @@
     display: inline-flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, #000000 0%, #4b4b00 40%, #ffd700 100%);
     font-weight: 600;
-    color: #fff;width: 36px; height: 36px; border-radius: 50%;
-    background: #0d6efd; display: grid; place-items: center;
-    font-weight: bold; color: #fff;
+    color: #fff;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #0d6efd;
+    display: grid;
+    place-items: center;
+    font-weight: bold;
+    color: #fff;
   }
   body {
     margin-left: 240px; /* deja espacio para la barra lateral */

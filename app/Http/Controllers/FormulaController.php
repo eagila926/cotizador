@@ -14,24 +14,43 @@ use Illuminate\Support\Str;
 class FormulaController extends Controller
 {
     // ===================== Constantes de negocio =====================
-    // Cápsula única de 475 mg
-    private const CAPS_MG_POR_UND = 475;
+    // Cápsula única de 465 mg
+    private const CAPS_MG_POR_UND = 465;
 
-    // Códigos de inventario (ajústalos a tu catálogo real)
-    private const COD_CAPSULA_475 = 3994; // CÁPSULA 475 mg
+    // Códigos de inventario
+    private const COD_CAPSULA_465 = 3392; // CÁPSULA 465 mg
     private const COD_PASTILLERO  = 3396; // PASTILLERO
 
-    // Insumos
+    // Insumos por pastillero (existentes)
     private const COD_TAPA_SEG    = 3397; // Tapa de seguridad
     private const COD_LINNER      = 3395; // Linner espumado
     private const COD_ETIQUETA    = 3393; // Etiqueta
 
+    // Insumos adicionales por pastillero (nuevos)
+    private const COD_EXTRA_1     = 3434;
+    private const COD_EXTRA_2     = 3435;
+    private const COD_EXTRA_3     = 3436;
+
     // Relleno
     private const COD_CELULOSA    = 3291; // CELULOSA
 
-    // Regla de capacidad de pastillero (unidades)
+    // Regla de capacidad de pastillero (unidades al mes)
     private const PAST_CAP_SMALL = 60;
     private const PAST_CAP_LARGE = 150;
+
+    /**
+     * Conversiones especiales UI -> mg (por cod_odoo)
+     * - 3388 Vit D3: 1 UI = 0.025 ug = 0.000025 mg
+     * - 3381 Vit A : 1 UI = 0.55 ug  = 0.00055 mg
+     * - 3375 Vit E : 1 UI = 1 mg     = 1 mg
+     */
+    private const UI_TO_MG = [
+        3388 => 0.000025,
+        3381 => 0.00055,
+        3375 => 1.0,
+    ];
+
+    private const UI_FALLBACK_TO_MG = 0.00067;
 
     // ===================== Vistas =====================
     public function index(Request $request)
@@ -50,16 +69,19 @@ class FormulaController extends Controller
             ->orWhere('cod_odoo', 'like', "%{$term}%")
             ->orderBy('nombre')
             ->limit(15)
-            ->get(['cod_odoo', 'nombre']);
+            ->get(['cod_odoo', 'nombre', 'unidad']);
 
         $html = '';
         foreach ($items as $it) {
             $html .= '<div class="suggest-element" '
                 .'data-cod_odoo="'.e($it->cod_odoo).'" '
+                .'data-nombre="'.e($it->nombre).'" '
+                .'data-unidad="'.e($it->unidad).'" '
                 .'style="padding:6px; cursor:pointer; border-bottom:1px solid #eee">'
-                .e($it->nombre)
+                .e($it->nombre).' <small style="opacity:.6">('.e($it->unidad).')</small>'
                 .'</div>';
         }
+
         return $html;
     }
 
@@ -70,27 +92,36 @@ class FormulaController extends Controller
             'activo'   => 'required|string|max:255',
             'cod_odoo' => 'required|integer',
             'cantidad' => 'required|numeric|min:0.0001',
-            'unidad'   => 'required|in:g,mg,mcg,UI',
+            // unidad se fuerza desde DB
         ]);
 
         $userId = Auth::id() ?? $request->session()->get('user_id');
         if (!$userId) return response('NO_USER', 401);
 
-        $exists = ActivoTemp::where('user_id',$userId)
-            ->where('cod_odoo',$request->cod_odoo)
+        $activoDB = Activo::query()
+            ->where('cod_odoo', (int)$request->cod_odoo)
+            ->first(['cod_odoo', 'nombre', 'unidad']);
+
+        if (!$activoDB) {
+            return response()->json(['error' => 'ACTIVO_NO_EXISTE'], 422);
+        }
+
+        $exists = ActivoTemp::where('user_id', $userId)
+            ->where('cod_odoo', (int)$activoDB->cod_odoo)
             ->exists();
 
         if ($exists) return response('duplicado', 200);
 
         ActivoTemp::create([
             'user_id'  => $userId,
-            'cod_odoo' => (int)$request->cod_odoo,
+            'cod_odoo' => (int)$activoDB->cod_odoo,
+            // Si quieres forzar nombre oficial, usa $activoDB->nombre:
             'activo'   => (string)$request->activo,
-            'cantidad' => (float)$request->cantidad,
-            'unidad'   => (string)$request->unidad,
+            'cantidad' => (float)$request->cantidad, // por día
+            'unidad'   => (string)$activoDB->unidad, // unidad oficial desde DB
         ]);
 
-        return response()->json(['status' => 'ok']);
+        return response()->json(['status' => 'ok', 'unidad' => $activoDB->unidad]);
     }
 
     public function listarTemp(Request $request)
@@ -117,16 +148,18 @@ class FormulaController extends Controller
             $html .= '<td><button class="btn btn-sm btn-danger" onclick="eliminarFila('.$r->id.')">X</button></td>';
             $html .= '</tr>';
         }
+
         return $html;
     }
 
     public function eliminarTemp(Request $request)
     {
         $request->validate(['id' => 'required|integer']);
+
         $userId = Auth::id() ?? $request->session()->get('user_id');
         if (!$userId) return response('NO_USER', 401);
 
-        $row = ActivoTemp::where('user_id',$userId)->where('id',$request->id)->first();
+        $row = ActivoTemp::where('user_id', $userId)->where('id', $request->id)->first();
         if (!$row) return response('NOT_FOUND', 404);
 
         $row->delete();
@@ -149,16 +182,15 @@ class FormulaController extends Controller
     }
 
     // ===================== Utilitarios =====================
-    private function slugNoAcentos(string $texto): string
-    {
-        return (string) Str::of($texto)->squish()->lower()->ascii();
-    }
-
     private function buildCodFormula(): string
     {
-        // Mantengo tu formato actual (solo random)
         $random = random_int(100000, 999999);
         return "FORMU.{$random}";
+    }
+
+    private function isUnidadDiaria(?string $u): bool
+    {
+        return in_array($u, ['g','mg','mcg','UI'], true);
     }
 
     private function toMgDia(float $cantidad, string $unidad, int $cod_odoo): float
@@ -167,43 +199,17 @@ class FormulaController extends Controller
             'g'   => $cantidad * 1000.0,
             'mg'  => $cantidad,
             'mcg' => $cantidad / 1000.0,
-            'UI'  => ($cod_odoo === 1343)
-                        ? ($cantidad * 0.000025 / 1000.0)
-                        : ($cantidad * 0.00067),
+            'UI'  => $cantidad * (self::UI_TO_MG[$cod_odoo] ?? self::UI_FALLBACK_TO_MG),
             default => 0.0,
         };
     }
 
-    /**
-     * Opción 1: tabla de rangos como tu imagen.
-     * Retorna: tomas, caps_dia, caps_mes.
-     */
-    private function capsulasPorRango(float $totalMgDia): array
+    private function capsulasPorCapacidad(float $totalMgDia): array
     {
         if ($totalMgDia <= 0) {
             return ['tomas' => 0, 'caps_dia' => 0, 'caps_mes' => 0];
         }
 
-        $rangos = [
-            ['desde' => 0,    'hasta' => 475,  'tomas' => 1, 'caps_mes' => 30],
-            ['desde' => 476,  'hasta' => 950,  'tomas' => 2, 'caps_mes' => 60],
-            ['desde' => 951,  'hasta' => 1425, 'tomas' => 3, 'caps_mes' => 90],
-            ['desde' => 1426, 'hasta' => 1900, 'tomas' => 4, 'caps_mes' => 120],
-            ['desde' => 1901, 'hasta' => 2850, 'tomas' => 6, 'caps_mes' => 180],
-            ['desde' => 2851, 'hasta' => 4275, 'tomas' => 9, 'caps_mes' => 270],
-        ];
-
-        foreach ($rangos as $r) {
-            if ($totalMgDia >= $r['desde'] && $totalMgDia <= $r['hasta']) {
-                return [
-                    'tomas'    => (int)$r['tomas'],
-                    'caps_dia' => (int)$r['tomas'],
-                    'caps_mes' => (int)$r['caps_mes'],
-                ];
-            }
-        }
-
-        // Fallback si supera el último rango
         $capsDia = (int) ceil($totalMgDia / self::CAPS_MG_POR_UND);
 
         return [
@@ -223,7 +229,7 @@ class FormulaController extends Controller
         return (int) ceil($needed / self::PAST_CAP_LARGE);
     }
 
-    private function buildCatalog(array $cods): \Illuminate\Support\Collection
+    private function buildCatalog(array $cods)
     {
         return Activo::whereIn('cod_odoo', $cods)
             ->get(['cod_odoo','nombre','valor_costo'])
@@ -231,10 +237,10 @@ class FormulaController extends Controller
     }
 
     /**
-     * Builder único. Construye todas las filas finales y los totales.
+     * Construye el resumen y retorna filas y metadatos.
      * mode:
-     * - 'view': incluye valor_costo y mg_dia (para tus tablas)
-     * - 'save': incluye masa_mes (g/mes) para los items guardados
+     * - 'view': incluye valor_costo y mg_dia
+     * - 'save': incluye masa_mes (g/mes) para guardar items
      */
     private function buildCapsuleSummary(int $userId, string $mode = 'view'): array
     {
@@ -245,11 +251,14 @@ class FormulaController extends Controller
         $cods = $items->pluck('cod_odoo')->map(fn($c)=>(int)$c)->all();
         $cods = array_merge($cods, [
             self::COD_CELULOSA,
-            self::COD_CAPSULA_475,
+            self::COD_CAPSULA_465,
             self::COD_PASTILLERO,
             self::COD_TAPA_SEG,
             self::COD_LINNER,
             self::COD_ETIQUETA,
+            self::COD_EXTRA_1,
+            self::COD_EXTRA_2,
+            self::COD_EXTRA_3,
         ]);
         $cods = array_values(array_unique($cods));
 
@@ -266,7 +275,7 @@ class FormulaController extends Controller
             $row = [
                 'cod_odoo' => (int)$r->cod_odoo,
                 'activo'   => (string)$r->activo,
-                'cantidad' => (float)$r->cantidad,  // por día (referencial)
+                'cantidad' => (float)$r->cantidad,
                 'unidad'   => (string)$r->unidad,
                 'mg_dia'   => $mgDia,
             ];
@@ -276,24 +285,21 @@ class FormulaController extends Controller
             }
 
             if ($mode === 'save') {
-                // masa_mes en g (mg_dia * 30 / 1000)
-                $row['masa_mes'] = (($mgDia * 30.0) / 1000.0);
+                $row['masa_mes'] = (($mgDia * 30.0) / 1000.0); // g/mes
             }
 
             $rows->push($row);
         }
 
-        // Regla cápsulas por rango
-        $regla = $this->capsulasPorRango($totalMgDia);
+        // Cápsulas por capacidad
+        $regla = $this->capsulasPorCapacidad($totalMgDia);
         $capsDia = (int)$regla['caps_dia'];
         $capsMes = (int)$regla['caps_mes'];
         $tomasDiarias = (int)$regla['tomas'];
 
-        // Total masa mes (g/mes) de activos base (sin cápsulas/pastillero/insumos)
-        // Nota: puedes decidir si sumar celulosa también; por defecto lo dejo como "base".
         $totalMasaMesBase = ($totalMgDia * 30.0) / 1000.0;
 
-        // Relleno con celulosa hasta el límite del rango (mg/día)
+        // Relleno con celulosa hasta el límite diario
         $limiteMgDia  = $capsDia * self::CAPS_MG_POR_UND;
         $rellenoMgDia = max(0.0, $limiteMgDia - $totalMgDia);
 
@@ -301,7 +307,7 @@ class FormulaController extends Controller
             $rowCel = [
                 'cod_odoo' => self::COD_CELULOSA,
                 'activo'   => $catalogo[self::COD_CELULOSA]->nombre ?? 'CELULOSA',
-                'cantidad' => $rellenoMgDia, // mg/día
+                'cantidad' => $rellenoMgDia,
                 'unidad'   => 'mg',
                 'mg_dia'   => $rellenoMgDia,
             ];
@@ -317,18 +323,18 @@ class FormulaController extends Controller
             $rows->push($rowCel);
         }
 
-        // Pastillero según cápsulas/mes
+        // Pastillero
         $pastCount = $this->pastillerosNecesarios($capsMes);
 
         // Cápsulas (und/mes)
         $rowCaps = [
-            'cod_odoo' => self::COD_CAPSULA_475,
-            'activo'   => $catalogo[self::COD_CAPSULA_475]->nombre ?? 'CÁPSULA 475 mg',
+            'cod_odoo' => self::COD_CAPSULA_465,
+            'activo'   => $catalogo[self::COD_CAPSULA_465]->nombre ?? 'CÁPSULA 465 mg',
             'cantidad' => (float)$capsMes,
             'unidad'   => 'und',
             'mg_dia'   => null,
         ];
-        if ($withCost) $rowCaps['valor_costo'] = (float)($catalogo[self::COD_CAPSULA_475]->valor_costo ?? 0);
+        if ($withCost) $rowCaps['valor_costo'] = (float)($catalogo[self::COD_CAPSULA_465]->valor_costo ?? 0);
         if ($mode === 'save') $rowCaps['masa_mes'] = null;
         $rows->push($rowCaps);
 
@@ -344,11 +350,14 @@ class FormulaController extends Controller
         if ($mode === 'save') $rowPast['masa_mes'] = null;
         $rows->push($rowPast);
 
-        // Insumos por pastillero
+        // Insumos por pastillero: tapa/linner/etiqueta + 3434/3435/3436
         $insumos = [
             [self::COD_TAPA_SEG, 'TAPA DE SEGURIDAD'],
             [self::COD_LINNER,   'LINNER ESPUMADO'],
             [self::COD_ETIQUETA, 'ETIQUETA'],
+            [self::COD_EXTRA_1,  'CIF'],
+            [self::COD_EXTRA_2,  'MOI'],
+            [self::COD_EXTRA_3,  'MOD'],
         ];
 
         foreach ($insumos as [$cod, $fallbackNombre]) {
@@ -375,21 +384,70 @@ class FormulaController extends Controller
         ];
     }
 
+    /**
+     * Calcula precios a partir de filas del builder (con valor_costo).
+     * Regla:
+     * - diarios: mg/día -> g/mes -> g_mes * valor_costo
+     * - und: cantidad * valor_costo
+     * - pvp = ceil(total + total*3)
+     * - medico = 80% pvp
+     * - distribuidor = 65% pvp
+     */
+    private function computePricing($rows): array
+    {
+        $totalGeneral = 0.0;
+
+        foreach ($rows as $r) {
+            $unidad = $r['unidad'] ?? null;
+            $valor  = (float)($r['valor_costo'] ?? 0);
+
+            if ($this->isUnidadDiaria($unidad)) {
+                $mg_dia = (float)($r['mg_dia'] ?? 0);
+                $g_mes  = ($mg_dia * 30.0) / 1000.0;
+                $totalGeneral += ($g_mes * $valor);
+            } else {
+                $und_mes = (float)($r['cantidad'] ?? 0);
+                $totalGeneral += ($und_mes * $valor);
+            }
+        }
+
+        $pvp  = (float) ceil($totalGeneral + ($totalGeneral * 3.0));
+        $med  = round($pvp * 0.80, 2);
+        $dis  = round($pvp * 0.65, 2);
+
+        return [
+            'totalGeneral' => $totalGeneral,
+            'pvp'          => $pvp,
+            'medico'       => $med,
+            'distribuidor' => $dis,
+        ];
+    }
+
     private function renderResumenCapsulas(Request $request)
     {
         $userId = Auth::id() ?? $request->session()->get('user_id');
         if (!$userId) abort(401);
 
-        $data = $this->buildCapsuleSummary($userId, 'view');
+        // 1) Builder con costos para poder calcular precios en backend
+        $dataView = $this->buildCapsuleSummary($userId, 'view');
+
+        // 2) Precios calculados desde el controlador
+        $pricing = $this->computePricing($dataView['rows']);
 
         return view('formulas.resumen_capsulas', [
-            'rows'          => $data['rows'],
-            'totalMgDia'    => $data['totalMgDia'],
-            'totalMasaMes'  => $data['totalMasaMes'],
-            'capsDia'       => $data['capsDia'],
-            'capsMes'       => $data['capsMes'],
-            'tomasDiarias'  => $data['tomasDiarias'],
+            'rows'          => $dataView['rows'],
+            'totalMgDia'    => $dataView['totalMgDia'],
+            'totalMasaMes'  => $dataView['totalMasaMes'],
+            'capsDia'       => $dataView['capsDia'],
+            'capsMes'       => $dataView['capsMes'],
+            'tomasDiarias'  => $dataView['tomasDiarias'],
             'codFormula'    => $this->buildCodFormula(),
+
+            // precios para la vista
+            'totalGeneral'  => $pricing['totalGeneral'],
+            'precio_pvp_v'  => $pricing['pvp'],
+            'precio_med_v'  => $pricing['medico'],
+            'precio_dis_v'  => $pricing['distribuidor'],
         ]);
     }
 
@@ -397,14 +455,10 @@ class FormulaController extends Controller
     public function guardar(Request $request)
     {
         $request->validate([
-            'cod_formula'           => ['required','string','max:30'],
-            'nombre_etiqueta'       => ['nullable','string','max:150'],
-            'medico'                => ['nullable','string','max:150'],
-            'paciente'              => ['nullable','string','max:150'],
-            'precio_medico'         => ['nullable','numeric'],
-            'precio_publico'        => ['nullable','numeric'],
-            'precio_distribuidor'   => ['nullable','numeric'],
-            'tomas_diarias'         => ['nullable','numeric'],
+            'cod_formula'     => ['required','string','max:30'],
+            'nombre_etiqueta' => ['nullable','string','max:150'],
+            'medico'          => ['nullable','string','max:150'],
+            'paciente'        => ['nullable','string','max:150'],
         ]);
 
         $userId = Auth::id();
@@ -415,35 +469,46 @@ class FormulaController extends Controller
 
         DB::transaction(function () use ($request, $userId, $codigoBackend, &$formulaCreada) {
 
-            $precio_medico       = max(0, (float)$request->input('precio_medico', 0));
-            $precio_publico      = (float)$request->input('precio_publico', 0);
-            $precio_distribuidor = (float)$request->input('precio_distribuidor', 0);
+            // 1) Builder con costos para calcular precios server-side
+            $dataView = $this->buildCapsuleSummary($userId, 'view');
+            $pricing  = $this->computePricing($dataView['rows']);
+
+            // 2) Builder para guardar items (masa_mes etc.)
+            $dataSave = $this->buildCapsuleSummary($userId, 'save');
 
             $formulaCreada = Formula::create([
                 'codigo'              => $codigoBackend,
                 'nombre_etiqueta'     => $request->input('nombre_etiqueta'),
                 'user_id'             => $userId,
-                'precio_medico'       => round($precio_medico, 2),
-                'precio_publico'      => round($precio_publico, 2),
-                'precio_distribuidor' => round($precio_distribuidor, 2),
+
+                // precios: salen del cálculo backend
+                'precio_medico'       => round((float)$pricing['medico'], 2),
+                'precio_publico'      => round((float)$pricing['pvp'], 2),
+                'precio_distribuidor' => round((float)$pricing['distribuidor'], 2),
+
                 'medico'              => $request->input('medico'),
                 'paciente'            => $request->input('paciente'),
-                'tomas_diarias'       => (float)$request->input('tomas_diarias', 0),
+
+                // tomas_diarias: desde el cálculo de cápsulas
+                'tomas_diarias'       => (float)($dataSave['capsDia'] ?? 0),
             ]);
 
-            // Builder único para guardar (incluye masa_mes)
-            $data = $this->buildCapsuleSummary($userId, 'save');
-            $rows = $data['rows'];
+            // Insert items
+            $rows = $dataSave['rows'];
+            $now  = now();
 
-            $now = now();
             $insert = $rows->map(function ($r) use ($codigoBackend, $now) {
                 return [
                     'codigo'     => $codigoBackend,
                     'cod_odoo'   => (int)($r['cod_odoo'] ?? 0),
                     'activo'     => (string)($r['activo'] ?? ''),
                     'unidad'     => $r['unidad'] ?? null,
-                    'masa_mes'   => array_key_exists('masa_mes', $r) ? (is_null($r['masa_mes']) ? null : (float)$r['masa_mes']) : null,
-                    'cantidad'   => array_key_exists('cantidad', $r) ? (is_null($r['cantidad']) ? null : (float)$r['cantidad']) : null,
+                    'masa_mes'   => array_key_exists('masa_mes', $r)
+                        ? (is_null($r['masa_mes']) ? null : (float)$r['masa_mes'])
+                        : null,
+                    'cantidad'   => array_key_exists('cantidad', $r)
+                        ? (is_null($r['cantidad']) ? null : (float)$r['cantidad'])
+                        : null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -453,6 +518,7 @@ class FormulaController extends Controller
                 FormulaItem::insert($insert);
             }
 
+            // Limpia temporales
             ActivoTemp::where('user_id', $userId)->delete();
         });
 
@@ -486,20 +552,22 @@ class FormulaController extends Controller
     public function cargarParaEditar(int $id)
     {
         $userId  = Auth::id();
-
         $formula = Formula::findOrFail($id);
 
-        // Excluir: celulosa + cápsulas + pastillero + insumos fijos
+        // Excluir: celulosa + cápsula + pastillero + insumos fijos + extras
         $codsExcluir  = [
             self::COD_CELULOSA,
-            self::COD_CAPSULA_475,
+            self::COD_CAPSULA_465,
             self::COD_PASTILLERO,
             self::COD_TAPA_SEG,
             self::COD_LINNER,
             self::COD_ETIQUETA,
+            self::COD_EXTRA_1,
+            self::COD_EXTRA_2,
+            self::COD_EXTRA_3,
         ];
 
-        $regexExcluir = '/(celulosa|capsula|cápsula|capsulas|cápsulas|pastillero|pastilleros|tapa|linner|etiqueta)/i';
+        $regexExcluir = '/(celulosa|capsula|cápsula|capsulas|cápsulas|pastillero|pastilleros|tapa|linner|etiqueta|3434|3435|3436)/i';
 
         DB::transaction(function () use ($userId, $formula, $codsExcluir, $regexExcluir) {
             ActivoTemp::where('user_id', $userId)->delete();
