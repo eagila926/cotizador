@@ -15,7 +15,7 @@ class FormulaController extends Controller
 {
     // ===================== Constantes de negocio =====================
     // Cápsula única de 465 mg
-    private const CAPS_MG_POR_UND = 465;
+    private const CAPS_MG_POR_UND = 475;
 
     // Códigos de inventario
     private const COD_CAPSULA_465 = 3392; // CÁPSULA 465 mg
