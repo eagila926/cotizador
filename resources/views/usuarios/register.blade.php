@@ -28,7 +28,11 @@
 
         <div class="mb-3">
             <label>Rol</label>
-            <input type="text" name="rol" class="form-control" required>
+            <select name="rol" class="form-control" required>
+                <option value="">Seleccione un rol</option>
+                <option value="ADMIN">Administrador</option>
+                <option value="VISITADOR">Visitador</option>
+            </select>
         </div>
 
         <div class="mb-3">
