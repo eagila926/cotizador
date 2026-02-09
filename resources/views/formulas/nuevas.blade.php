@@ -1,4 +1,5 @@
 @extends('layouts.app')
+
 @push('styles')
 <style>
   /* < md (menos de 768px) */
@@ -103,6 +104,56 @@
     headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
   });
 
+  // ===== Probióticos (misma lista que backend) =====
+  const PROBIO_CODES = new Set([
+    3371,
+    3278, 3277, 3321, 3320, 3325, 3322, 3323, 3324, 3370,
+    3279, 3280, 3282, 3319, 3326, 3327, 3328, 3329, 3372, 3281, 3318
+  ]);
+
+  const PROBIO_UFC_PER_G = {
+    3371: 20000000000,
+    3278: 100000000000,
+    3277: 100000000000,
+    3321: 100000000000,
+    3320: 100000000000,
+    3325: 100000000000,
+    3322: 100000000000,
+    3323: 100000000000,
+    3324: 100000000000,
+    3370: 100000000000,
+    3279: 200000000000,
+    3280: 200000000000,
+    3282: 200000000000,
+    3319: 200000000000,
+    3326: 200000000000,
+    3327: 200000000000,
+    3328: 200000000000,
+    3329: 200000000000,
+    3372: 200000000000,
+    3281: 200000000000,
+    3318: 200000000000,
+  };
+
+  function ufcToMg(ufc, codOdoo) {
+    const pot = PROBIO_UFC_PER_G[codOdoo];
+    if (!pot || pot <= 0) return 0;
+    return (ufc / pot) * 1000;
+  }
+
+  // UI -> mg (alineado al controlador)
+  const UI_TO_MG = {
+    3388: 0.000025,
+    3381: 0.00055,
+    3375: 1.0,
+  };
+  const UI_FALLBACK_TO_MG = 0.00067;
+
+  function uiToMg(ui, codOdoo) {
+    const f = UI_TO_MG[codOdoo] ?? UI_FALLBACK_TO_MG;
+    return ui * f;
+  }
+
   // Buscar (sugerencias)
   function buscarActivo(valor) {
     if (!valor || valor.length < 1) {
@@ -117,32 +168,60 @@
         const cod    = $(this).data('cod_odoo');
         const nombre = $(this).text();
 
-        // Lee valores para mostrar (compatibilidad con catálogos antiguos)
         const minRaw = $(this).data('minimo');
         const maxRaw = $(this).data('maximo');
         const minNum = (minRaw === '' || minRaw === null || isNaN(Number(minRaw))) ? null : Number(minRaw);
         const maxNum = (maxRaw === '' || maxRaw === null || isNaN(Number(maxRaw))) ? null : Number(maxRaw);
-        const unidad = (($(this).data('unidad') || 'mg') + '').trim();
+        const unidadBase = (($(this).data('unidad') || 'mg') + '').trim().toLowerCase();
+
+        const codNum = parseInt(cod, 10);
+        const isProbio = PROBIO_CODES.has(codNum);
 
         $('#activo').val(nombre).data('cod_odoo', cod);
 
+        // min/max (solo informativo). Para probióticos no tiene mucho sentido en UFC, así que lo dejamos con unidadBase.
         const fmtUM = (v, u) => (v === null ? '—' : `${v} ${u}`);
-        $('#minMaxLabel').text(`Mínimo: ${fmtUM(minNum, unidad)} ; Máximo: ${fmtUM(maxNum, unidad)}`);
+        $('#minMaxLabel').text(`Mínimo: ${fmtUM(minNum, unidadBase)} ; Máximo: ${fmtUM(maxNum, unidadBase)}`);
+
+        // Step recomendado
+        let step = (unidadBase === 'mcg') ? 1 : (unidadBase === 'mg' ? 0.01 : 1);
+
+        // En probióticos, dejamos el input listo para mg por defecto
+        if (isProbio) {
+          $('#unidad')
+            .html(`
+              <option value="mg" selected>mg</option>
+              <option value="UFC">UFC</option>
+            `)
+            .prop('disabled', false);
+
+          step = 0.01; // mg por defecto
+        } else {
+          $('#unidad')
+            .html(`<option value="${unidadBase}" selected>${unidadBase}</option>`)
+            .prop('disabled', true);
+        }
 
         $('#cant')
           .attr('min', minNum === null ? '' : minNum)
           .attr('max', maxNum === null ? '' : maxNum)
-          .attr('step', unidad === 'mcg' ? 1 : (unidad === 'mg' ? 0.01 : 1));
-
-        $('#unidad')
-          .html(`<option value="${unidad}" selected>${unidad}</option>`)
-          .prop('disabled', true);
+          .attr('step', step);
 
         $('#resultados-activos').hide();
       });
 
     });
   }
+
+  // Si cambian unidad a UFC, ajusta step
+  $('#unidad').on('change', function() {
+    const u = ($('#unidad').val() || '').trim();
+    if (u === 'UFC') {
+      $('#cant').attr('step', 1); // UFC enteros
+    } else if (u === 'mg') {
+      $('#cant').attr('step', 0.01);
+    }
+  });
 
   // Listar tabla
   function mostrarActivos() {
@@ -151,7 +230,7 @@
     });
   }
 
-  // Agregar a temp (sin restricción de cantidad de filas)
+  // Agregar a temp
   function agregarFila() {
     const activo  = $('#activo').val();
     const codOdoo = $('#activo').data('cod_odoo');
@@ -164,16 +243,18 @@
     }
 
     $.post("{{ route('formulas.agregar') }}", {
-      activo: activo, cod_odoo: codOdoo, cantidad: cant, unidad: unidad
+      activo: activo,
+      cod_odoo: codOdoo,
+      cantidad: cant,
+      unidad: unidad
     }, function (res) {
       let data = res;
       if (typeof res === 'string') {
-        try { data = JSON.parse(res); } catch(e) { /* compat con respuestas antiguas */ }
+        try { data = JSON.parse(res); } catch(e) {}
       }
 
       if (typeof data === 'object' && data !== null) {
         if (data.status === 'ok') {
-          // limpiar inputs
           $('#activo').val('').data('cod_odoo','');
           $('#cant').val('').removeAttr('min').removeAttr('max').removeAttr('step');
           $('#unidad').html('').prop('disabled', false);
@@ -201,14 +282,13 @@
         alert('Error al guardar: ' + r);
       }
     });
-
   }
 
   // Eliminar una fila
   function eliminarFila(id) {
     if (!confirm('¿Estás seguro de eliminar este activo?')) return;
     $.post("{{ route('formulas.eliminar') }}", { id: id }, function (res) {
-      if (res.trim() === 'ok') mostrarActivos();
+      if ((res + '').trim() === 'ok') mostrarActivos();
       else alert('Error al eliminar: ' + res);
     });
   }
@@ -218,7 +298,7 @@
   function eliminarTodosLosActivos() {
     if (!confirm('¿Estás seguro de eliminar todos los activos?')) return;
     $.post("{{ route('formulas.eliminarTodos') }}", {}, function (res) {
-      if (res.trim() === 'OK') mostrarActivos();
+      if ((res + '').trim() === 'OK') mostrarActivos();
       else alert('Error al eliminar: ' + res);
     });
   }
@@ -227,38 +307,48 @@
   // Cargar al entrar
   document.addEventListener('DOMContentLoaded', mostrarActivos);
 
-  // === TOTAL EN MG (sin límites ni bloqueos) ===
+  // === TOTAL EN MG (incluye UFC para probióticos) ===
   function verificarCondiciones() {
     $.get("{{ route('formulas.listar') }}?json=1", function (activos) {
       const codigosProhibidos = [4520, 1205, 1044, 1086, 70136, 1163];
+
       let totalMg = 0;
       let contieneProhibido = false;
 
       (Array.isArray(activos) ? activos : []).forEach(item => {
         const cantidad = parseFloat(item.cantidad);
-        const unidad   = item.unidad;
+        const unidad   = (item.unidad || '').trim();
         const codOdoo  = parseInt(item.cod_odoo);
 
         let cantidadMg = 0;
+
         switch (unidad) {
-          case 'mg':  cantidadMg = cantidad;        break;
-          case 'mcg': cantidadMg = cantidad / 1000; break;
-          case 'UI':  cantidadMg = (codOdoo === 1343)
-                      ? (cantidad * 0.000025 / 1000)
-                      : (cantidad * 0.00067);
-                      break;
-          default:    cantidadMg = 0;
+          case 'mg':
+            cantidadMg = cantidad;
+            break;
+          case 'mcg':
+            cantidadMg = cantidad / 1000;
+            break;
+          case 'g':
+            cantidadMg = cantidad * 1000;
+            break;
+          case 'UI':
+            cantidadMg = uiToMg(cantidad, codOdoo);
+            break;
+          case 'UFC':
+            cantidadMg = ufcToMg(cantidad, codOdoo);
+            break;
+          default:
+            cantidadMg = 0;
         }
 
         totalMg += cantidadMg;
         if (codigosProhibidos.includes(codOdoo)) contieneProhibido = true;
       });
 
-      // Total mg
       const $total = $('#total');
       if ($total.length) $total.text(`Total: ${totalMg.toFixed(2)} mg`);
 
-      // (Opcional) Si usas botón de sobres en otro layout
       const $btnSobres = $('#btnSobres');
       if ($btnSobres.length) $btnSobres.prop('disabled', contieneProhibido || totalMg < 2499);
 
@@ -273,7 +363,6 @@
     setTimeout(verificarCondiciones, 120);
   };
 
-  // También al cargar por primera vez
   document.addEventListener('DOMContentLoaded', function () {
     setTimeout(verificarCondiciones, 200);
   });

@@ -9,12 +9,11 @@ use App\Models\FormulaItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class FormulaController extends Controller
 {
     // ===================== Constantes de negocio =====================
-    // Cápsula única de 465 mg
+    // Cápsula única de 475 mg (según tu lógica actual)
     private const CAPS_MG_POR_UND = 475;
 
     // Códigos de inventario
@@ -52,6 +51,37 @@ class FormulaController extends Controller
 
     private const UI_FALLBACK_TO_MG = 0.00067;
 
+    // ===================== Probióticos (UFC -> mg) =====================
+    // Potencia UFC por gramo (UFC/g) por cod_odoo
+    private const PROBIO_UFC_PER_G = [
+        // 2e10
+        3371 => 20000000000,  // SACCHAROMYCES BOULARDII
+
+        // 1e11
+        3278 => 100000000000, // BIFIDOBACTERIUM ANIMALIS
+        3277 => 100000000000, // BIFIDOBACTERIUM ADOLESCENTIS
+        3321 => 100000000000, // LACTOBACILLUS CURVATUS
+        3320 => 100000000000, // LACTOBACILLUS CRISPATUS
+        3325 => 100000000000, // LACTOBACILLUS JOHNSONII
+        3322 => 100000000000, // LACTOBACILLUS FERMENTUM
+        3323 => 100000000000, // LACTOBACILLUS GASSERI
+        3324 => 100000000000, // LACTOBACILLUS HELVETICUS
+        3370 => 100000000000, // LACTOBACILLUS SALIVARIUS
+
+        // 2e11
+        3279 => 200000000000, // BIFIDOBACTERIUM BIFIDUM
+        3280 => 200000000000, // BIFIDOBACTERIUM BREVE
+        3282 => 200000000000, // BIFIDOBACTERIUM LONGUM
+        3319 => 200000000000, // LACTOBACILLUS CASEI
+        3326 => 200000000000, // LACTOBACILLUS PARACASEI
+        3327 => 200000000000, // LACTOBACILLUS PLANTARUM
+        3328 => 200000000000, // LACTOBACILLUS REUTERI
+        3329 => 200000000000, // LACTOBACILLUS RHAMNOSUS
+        3372 => 200000000000, // STREPTOCOCCUS THERMOPHILUS
+        3281 => 200000000000, // BIFIDOBACTERIUM LACTIS
+        3318 => 200000000000, // LACTOBACILLUS ACIDOPHILLUS
+    ];
+
     // ===================== Vistas =====================
     public function index(Request $request)
     {
@@ -85,6 +115,23 @@ class FormulaController extends Controller
         return $html;
     }
 
+    // ===================== Probióticos helpers =====================
+    private function isProbiotico(int $cod_odoo): bool
+    {
+        return array_key_exists($cod_odoo, self::PROBIO_UFC_PER_G);
+    }
+
+    /**
+     * mg = (UFC / potencia_UFC_por_gramo) * 1000
+     */
+    private function ufcToMg(float $ufc, int $cod_odoo): float
+    {
+        $pot = (float)(self::PROBIO_UFC_PER_G[$cod_odoo] ?? 0);
+        if ($pot <= 0 || $ufc <= 0) return 0.0;
+
+        return ($ufc / $pot) * 1000.0;
+    }
+
     // ===================== Temporales =====================
     public function agregarTemp(Request $request)
     {
@@ -92,7 +139,7 @@ class FormulaController extends Controller
             'activo'   => 'required|string|max:255',
             'cod_odoo' => 'required|integer',
             'cantidad' => 'required|numeric|min:0.0001',
-            // unidad se fuerza desde DB
+            'unidad'   => 'required|string|max:10',
         ]);
 
         $userId = Auth::id() ?? $request->session()->get('user_id');
@@ -103,25 +150,41 @@ class FormulaController extends Controller
             ->first(['cod_odoo', 'nombre', 'unidad']);
 
         if (!$activoDB) {
-            return response()->json(['error' => 'ACTIVO_NO_EXISTE'], 422);
+            return response()->json(['status' => 'ACTIVO_NO_EXISTE'], 422);
         }
 
         $exists = ActivoTemp::where('user_id', $userId)
             ->where('cod_odoo', (int)$activoDB->cod_odoo)
             ->exists();
 
-        if ($exists) return response('duplicado', 200);
+        if ($exists) return response()->json(['status' => 'duplicado'], 200);
+
+        $codOdoo = (int)$activoDB->cod_odoo;
+        $unidadReq = strtoupper(trim((string)$request->unidad)); // MG / UFC / UI / etc
+
+        // Default: activos normales => se fuerza unidad oficial de DB
+        $unidadFinal   = (string)$activoDB->unidad;
+        $cantidadFinal = (float)$request->cantidad;
+
+        // Probióticos: permitir que el usuario elija MG o UFC
+        if ($this->isProbiotico($codOdoo)) {
+            if (!in_array($unidadReq, ['MG', 'UFC'], true)) {
+                return response()->json(['status' => 'UNIDAD_INVALIDA'], 422);
+            }
+            // Guardar mg en minúscula (consistencia con tu sistema) y UFC en mayúscula
+            $unidadFinal = ($unidadReq === 'MG') ? 'mg' : 'UFC';
+            $cantidadFinal = (float)$request->cantidad; // mg/día o UFC/día según unidadFinal
+        }
 
         ActivoTemp::create([
             'user_id'  => $userId,
-            'cod_odoo' => (int)$activoDB->cod_odoo,
-            // Si quieres forzar nombre oficial, usa $activoDB->nombre:
+            'cod_odoo' => $codOdoo,
             'activo'   => (string)$request->activo,
-            'cantidad' => (float)$request->cantidad, // por día
-            'unidad'   => (string)$activoDB->unidad, // unidad oficial desde DB
+            'cantidad' => $cantidadFinal,
+            'unidad'   => (string)$unidadFinal,
         ]);
 
-        return response()->json(['status' => 'ok', 'unidad' => $activoDB->unidad]);
+        return response()->json(['status' => 'ok', 'unidad' => $unidadFinal]);
     }
 
     public function listarTemp(Request $request)
@@ -190,7 +253,7 @@ class FormulaController extends Controller
 
     private function isUnidadDiaria(?string $u): bool
     {
-        return in_array($u, ['g','mg','mcg','UI'], true);
+        return in_array($u, ['g','mg','mcg','UI','UFC'], true);
     }
 
     private function toMgDia(float $cantidad, string $unidad, int $cod_odoo): float
@@ -200,6 +263,7 @@ class FormulaController extends Controller
             'mg'  => $cantidad,
             'mcg' => $cantidad / 1000.0,
             'UI'  => $cantidad * (self::UI_TO_MG[$cod_odoo] ?? self::UI_FALLBACK_TO_MG),
+            'UFC' => $this->ufcToMg($cantidad, $cod_odoo), // cantidad = UFC/día
             default => 0.0,
         };
     }
@@ -350,29 +414,50 @@ class FormulaController extends Controller
         if ($mode === 'save') $rowPast['masa_mes'] = null;
         $rows->push($rowPast);
 
-        // Insumos por pastillero: tapa/linner/etiqueta + 3434/3435/3436
-        $insumos = [
-            [self::COD_TAPA_SEG, 'TAPA DE SEGURIDAD'],
-            [self::COD_LINNER,   'LINNER ESPUMADO'],
-            [self::COD_ETIQUETA, 'ETIQUETA'],
-            [self::COD_EXTRA_1,  'CIF'],
-            [self::COD_EXTRA_2,  'MOI'],
-            [self::COD_EXTRA_3,  'MOD'],
+        // Insumos por pastillero
+        // Insumos ligados al pastillero (cantidad = $pastCount)
+$insumosPorPastillero = [
+  [self::COD_TAPA_SEG, 'TAPA DE SEGURIDAD'],
+  [self::COD_LINNER,   'LINNER ESPUMADO'],
+  [self::COD_ETIQUETA, 'ETIQUETA'],
+];
+
+foreach ($insumosPorPastillero as [$cod, $fallbackNombre]) {
+  $rowIns = [
+    'cod_odoo' => (int)$cod,
+    'activo'   => $catalogo[(int)$cod]->nombre ?? $fallbackNombre,
+    'cantidad' => (float)$pastCount,
+    'unidad'   => 'und',
+    'mg_dia'   => null,
+  ];
+  if ($withCost) $rowIns['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
+  if ($mode === 'save') $rowIns['masa_mes'] = null;
+  $rows->push($rowIns);
+}
+
+        // CIF / MOI / MOD siempre 1 (no dependen del pastillero)
+        $insumosFijos = [
+        [self::COD_EXTRA_1, 'CIF'],
+        [self::COD_EXTRA_2, 'MOI'],
+        [self::COD_EXTRA_3, 'MOD'],
         ];
 
-        foreach ($insumos as [$cod, $fallbackNombre]) {
-            $rowIns = [
-                'cod_odoo' => (int)$cod,
-                'activo'   => $catalogo[(int)$cod]->nombre ?? $fallbackNombre,
-                'cantidad' => (float)$pastCount,
-                'unidad'   => 'und',
-                'mg_dia'   => null,
-            ];
-            if ($withCost) $rowIns['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
-            if ($mode === 'save') $rowIns['masa_mes'] = null;
+        foreach ($insumosFijos as [$cod, $fallbackNombre]) {
+        $rowFix = [
+            'cod_odoo' => (int)$cod,
+            'activo'   => $fallbackNombre, // nombre fijo (CIF/MOI/MOD)
+            'cantidad' => 1.0,
+            'unidad'   => 'und',
+            'mg_dia'   => null,
+        ];
 
-            $rows->push($rowIns);
+        // (opcional) si quieres seguir mostrando costo del catálogo:
+        if ($withCost) $rowFix['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
+        if ($mode === 'save') $rowFix['masa_mes'] = null;
+
+        $rows->push($rowFix);
         }
+
 
         return [
             'rows'          => $rows,
@@ -384,15 +469,6 @@ class FormulaController extends Controller
         ];
     }
 
-    /**
-     * Calcula precios a partir de filas del builder (con valor_costo).
-     * Regla:
-     * - diarios: mg/día -> g/mes -> g_mes * valor_costo
-     * - und: cantidad * valor_costo
-     * - pvp = ceil(total + total*3)
-     * - medico = 80% pvp
-     * - distribuidor = 65% pvp
-     */
     private function computePricing($rows): array
     {
         $totalGeneral = 0.0;
@@ -428,10 +504,7 @@ class FormulaController extends Controller
         $userId = Auth::id() ?? $request->session()->get('user_id');
         if (!$userId) abort(401);
 
-        // 1) Builder con costos para poder calcular precios en backend
         $dataView = $this->buildCapsuleSummary($userId, 'view');
-
-        // 2) Precios calculados desde el controlador
         $pricing = $this->computePricing($dataView['rows']);
 
         return view('formulas.resumen_capsulas', [
@@ -443,7 +516,6 @@ class FormulaController extends Controller
             'tomasDiarias'  => $dataView['tomasDiarias'],
             'codFormula'    => $this->buildCodFormula(),
 
-            // precios para la vista
             'totalGeneral'  => $pricing['totalGeneral'],
             'precio_pvp_v'  => $pricing['pvp'],
             'precio_med_v'  => $pricing['medico'],
@@ -469,11 +541,9 @@ class FormulaController extends Controller
 
         DB::transaction(function () use ($request, $userId, $codigoBackend, &$formulaCreada) {
 
-            // 1) Builder con costos para calcular precios server-side
             $dataView = $this->buildCapsuleSummary($userId, 'view');
             $pricing  = $this->computePricing($dataView['rows']);
 
-            // 2) Builder para guardar items (masa_mes etc.)
             $dataSave = $this->buildCapsuleSummary($userId, 'save');
 
             $formulaCreada = Formula::create([
@@ -481,7 +551,6 @@ class FormulaController extends Controller
                 'nombre_etiqueta'     => $request->input('nombre_etiqueta'),
                 'user_id'             => $userId,
 
-                // precios: salen del cálculo backend
                 'precio_medico'       => round((float)$pricing['medico'], 2),
                 'precio_publico'      => round((float)$pricing['pvp'], 2),
                 'precio_distribuidor' => round((float)$pricing['distribuidor'], 2),
@@ -489,11 +558,9 @@ class FormulaController extends Controller
                 'medico'              => $request->input('medico'),
                 'paciente'            => $request->input('paciente'),
 
-                // tomas_diarias: desde el cálculo de cápsulas
                 'tomas_diarias'       => (float)($dataSave['capsDia'] ?? 0),
             ]);
 
-            // Insert items
             $rows = $dataSave['rows'];
             $now  = now();
 
@@ -518,7 +585,6 @@ class FormulaController extends Controller
                 FormulaItem::insert($insert);
             }
 
-            // Limpia temporales
             ActivoTemp::where('user_id', $userId)->delete();
         });
 
@@ -527,7 +593,6 @@ class FormulaController extends Controller
                 ->with('ok', 'Fórmula guardada, pero no se pudo cargar en establecidas.');
         }
 
-        // Agregar a sesión fe_items para que aparezca en establecidas
         $items = $request->session()->get('fe_items', []);
         if (!collect($items)->firstWhere('id', (int)$formulaCreada->id)) {
             $items[] = ['id' => (int)$formulaCreada->id];
@@ -554,7 +619,6 @@ class FormulaController extends Controller
         $userId  = Auth::id();
         $formula = Formula::findOrFail($id);
 
-        // Excluir: celulosa + cápsula + pastillero + insumos fijos + extras
         $codsExcluir  = [
             self::COD_CELULOSA,
             self::COD_CAPSULA_465,
@@ -589,7 +653,6 @@ class FormulaController extends Controller
                 if (!is_null($it->cantidad) && $unidad !== 'und') {
                     $cantidad = (float)$it->cantidad;
                 } elseif (!is_null($it->masa_mes)) {
-                    // masa_mes en g ⇒ mg/mes ⇒ mg/día
                     $cantidad = ((float)$it->masa_mes * 1000.0) / 30.0;
                     $unidad   = 'mg';
                 } else {

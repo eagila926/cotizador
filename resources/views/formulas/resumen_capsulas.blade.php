@@ -71,7 +71,10 @@
         </thead>
 
         @php
-          $isUnidadDiaria = fn($u) => in_array($u, ['g','mg','mcg','UI'], true);
+          $isUnidadDiaria = function ($u) {
+            $uu = strtoupper(trim((string)$u));
+            return in_array($uu, ['G','MG','MCG','UI','UFC'], true);
+          };
 
           // Totales (separando diarios vs UND)
           $sumCantDiaria = 0.0; // suma cantidad (referencial) para diarios
