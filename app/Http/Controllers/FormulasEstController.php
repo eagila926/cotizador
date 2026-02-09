@@ -122,9 +122,9 @@ class FormulasEstController extends Controller
         $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
 
         $items = FormulaItem::where('codigo', $f->codigo)
-            ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
-            ->orderByDesc('id')
-            ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
+            ->orderByRaw('CASE WHEN cod_odoo = 3291 THEN 1 ELSE 0 END ASC')
+            ->orderBy('id', 'ASC') // o tu orden actual (created_at, etc.)
+            ->get();
 
         // ====== Cálculos resumen (tipo imagen 1–3) ======
         $tomasDia = (float)($f->tomas_diarias ?? 0);
@@ -305,9 +305,9 @@ class FormulasEstController extends Controller
         $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
 
         $items = FormulaItem::where('codigo', $f->codigo)
-            ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
-            ->orderByDesc('id')
-            ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
+            ->orderByRaw('CASE WHEN cod_odoo = 3291 THEN 1 ELSE 0 END ASC')
+            ->orderBy('id', 'ASC') // o tu orden actual (created_at, etc.)
+            ->get();
 
         $tomasDia = (float)($f->tomas_diarias ?? 0);
         if ($tomasDia <= 0) $tomasDia = 1.0;
