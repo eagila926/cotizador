@@ -25,67 +25,12 @@
       </div>
     </div>
 
-    {{-- ====== Resumen tipo imagen (1-3) ====== --}}
-    <div class="table-responsive mb-3">
-      <table class="table table-sm table-bordered align-middle">
-        <tbody>
-          <tr class="table-success">
-            <th style="width:260px">TOTAL PRINCIPIOS ACTIVOS</th>
-            <td class="text-end" id="sum-principios">
-              {{ number_format((float)($r['total_principios_mg_dia'] ?? 0), 2, '.', '') }}
-            </td>
-            <td style="width:80px">mg</td>
-          </tr>
-
-          <tr>
-            <th>Dosis diaria para 1 cápsula</th>
-            <td class="text-end" id="dose-caps">
-              {{ number_format((float)($r['dosis_caps_mg'] ?? 0), 2, '.', '') }}
-            </td>
-            <td>mg</td>
-          </tr>
-
-          <tr>
-            <th>Celulosa microcristalina (Avicel PH10)</th>
-            <td class="text-end" id="cel-caps">
-              {{ number_format((float)($r['celulosa_caps_mg'] ?? 0), 2, '.', '') }}
-            </td>
-            <td>mg</td>
-          </tr>
-
-          <tr>
-            <th>Contenido total para cápsula 0</th>
-            <td class="text-end" id="total-caps">
-              {{ number_format((float)($r['contenido_caps_mg'] ?? 0), 2, '.', '') }}
-            </td>
-            <td>mg</td>
-          </tr>
-
-          <tr class="table-success">
-            <th>PRESENTACIÓN:</th>
-            <td class="text-end">
-              {{ number_format((float)($r['presentacion_caps'] ?? 0), 0, '.', '') }}
-            </td>
-            <td>cápsulas</td>
-          </tr>
-
-          <tr class="table-success">
-            <th>DOSIFICACIÓN:</th>
-            <td class="text-end" id="tomas-dia">
-              {{ number_format((float)($r['dosificacion_caps_dia'] ?? 0), 0, '.', '') }}
-            </td>
-            <td>cápsulas diarias</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
     {{-- ====== Tabla ítems ====== --}}
     <div class="table-responsive">
       <table class="table table-bordered table-sm align-middle">
         <thead class="table-light">
           <tr>
-            <th>Cod. Odoo</th>
+            <th>Código</th>
             <th>Activo</th>
             <th class="text-end">Cantidad</th>
             <th>Unidad</th>
@@ -144,6 +89,62 @@
 
       </table>
     </div>
+
+        {{-- ====== Resumen tipo imagen (1-3) ====== --}}
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered align-middle">
+        <tbody>
+          <tr class="table-success">
+            <th style="width:260px">TOTAL PRINCIPIOS ACTIVOS</th>
+            <td class="text-end" id="sum-principios">
+              {{ number_format((float)($r['total_principios_mg_dia'] ?? 0), 2, '.', '') }}
+            </td>
+            <td style="width:80px">mg</td>
+          </tr>
+
+          <tr>
+            <th>Dosis diaria para 1 cápsula</th>
+            <td class="text-end" id="dose-caps">
+              {{ number_format((float)($r['dosis_caps_mg'] ?? 0), 2, '.', '') }}
+            </td>
+            <td>mg</td>
+          </tr>
+
+          <tr>
+            <th>Celulosa microcristalina (Avicel PH10)</th>
+            <td class="text-end" id="cel-caps">
+              {{ number_format((float)($r['celulosa_caps_mg'] ?? 0), 2, '.', '') }}
+            </td>
+            <td>mg</td>
+          </tr>
+
+          <tr>
+            <th>Contenido total para cápsula 0</th>
+            <td class="text-end" id="total-caps">
+              {{ number_format((float)($r['contenido_caps_mg'] ?? 0), 2, '.', '') }}
+            </td>
+            <td>mg</td>
+          </tr>
+
+          <tr class="table-success">
+            <th>PRESENTACIÓN:</th>
+            <td class="text-end">
+              {{ number_format((float)($r['presentacion_caps'] ?? 0), 0, '.', '') }}
+            </td>
+            <td>cápsulas</td>
+          </tr>
+
+          <tr class="table-success">
+            <th>DOSIFICACIÓN:</th>
+            <td class="text-end" id="tomas-dia">
+              {{ number_format((float)($r['dosificacion_caps_dia'] ?? 0), 0, '.', '') }}
+            </td>
+            <td>cápsulas diarias</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
 
   </div>
 </div>
