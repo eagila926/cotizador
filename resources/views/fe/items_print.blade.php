@@ -6,7 +6,6 @@
   <title>Impresión Ítems — {{ $f->codigo }}</title>
 
   <style>
-    /* Layout base */
     body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 12px; color: #111; }
     h2 { margin: 0 0 4px 0; font-size: 16px; }
     .sub { margin: 0 0 10px 0; color: #555; font-size: 12px; }
@@ -15,10 +14,12 @@
     th { background: #f2f2f2; text-align: left; }
     .right { text-align: right; }
 
-    /* Evitar cortes raros */
     .block { break-inside: avoid; page-break-inside: avoid; }
 
-    /* Print */
+    /* NUEVO */
+    .title-center { text-align: center; margin-bottom: 6px; }
+    .fecha { text-align: center; font-size: 12px; color: #555; margin: 0 0 12px 0; }
+
     @media print {
       @page { size: A4; margin: 8mm; }
       body { padding: 0; }
@@ -28,7 +29,18 @@
 </head>
 
 <body onload="window.print()">
+
+  {{-- Encabezado --}}
   <div class="block">
+    <div class="title-center">
+      <h2 style="margin:0;">Orden de producción</h2>
+    </div>
+
+    {{-- Fecha (puedes usar now() o $f->created_at) --}}
+    <p class="fecha">
+      Fecha: {{ optional($f->created_at)->format('d/m/Y') ?? now()->format('d/m/Y') }}
+    </p>
+
     <h2>Ítems de la fórmula</h2>
     <p class="sub">{{ $f->codigo }} — {{ $f->nombre_etiqueta }}</p>
   </div>
@@ -98,7 +110,6 @@
     </table>
   </div>
 
-  {{-- Botón opcional (no se imprime) --}}
   <div class="no-print" style="margin-top:10px;">
     <button onclick="window.print()">Imprimir</button>
     <button onclick="window.close()">Cerrar</button>
