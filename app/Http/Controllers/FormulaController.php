@@ -18,7 +18,7 @@ class FormulaController extends Controller
     private const COD_CAPSULA_465 = 3392;
     private const COD_PASTILLERO  = 3396;
 
-    private const COD_TAPA_SEG    = 3397;
+    private const COD_TAPA_SEG    = 3398;
     private const COD_LINNER      = 3395;
     private const COD_ETIQUETA    = 3393;
 
