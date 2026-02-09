@@ -8,18 +8,19 @@ use App\Models\FormulaItem;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Support\Facades\DB;
 
 class FormulasEstController extends Controller
 {
     private const SESSION_KEY = 'fe_items';
 
-    // OJO: aquí tenías repetido 3994 y faltaban varios; ajusta según tus códigos reales.
-    // Si 3393 (etiqueta) también va al final, inclúyelo.
-    private const NEW_END_CODES = [3994, 3796, 3397, 3395, 3393]; // cápsula, pastillero, tapa, linner, etiqueta
+    // Ajusta estos códigos a tus “insumos al final”.
+    private const NEW_END_CODES = [3994, 3796, 3397, 3395, 3393];
     private const OLD_END_CODES = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
 
     private const COD_CELULOSA = 3291;
+
+    // Para detectar “cápsula” en caso de que tus códigos varíen
+    private const CAPSULA_CODES_FALLBACK = [3392, 3994, 70274];
 
     public function index(Request $request)
     {
@@ -96,7 +97,7 @@ class FormulasEstController extends Controller
 
     public function print(Request $request, int $id)
     {
-        $formula = \App\Models\Formula::with('items')->findOrFail($id);
+        $formula = Formula::with('items')->findOrFail($id);
 
         $excluir = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
         $itemsComposicion = $formula->items
@@ -113,21 +114,11 @@ class FormulasEstController extends Controller
         ]);
     }
 
-    public function excel(Request $request, int $id)
-    {
-        $f = Formula::findOrFail($id, ['codigo','nombre_etiqueta','precio_medico','precio_publico','precio_distribuidor']);
-        $csv = "Codigo,Nombre Etiqueta,Precio Médico,Precio Distribuidor,Precio Paciente\n";
-        $csv.= "{$f->codigo},\"{$f->nombre_etiqueta}\",{$f->precio_medico},{$f->precio_distribuidor},{$f->precio_publico}\n";
-
-        return response($csv, 200, [
-            'Content-Type'=>'text/csv; charset=UTF-8',
-            'Content-Disposition'=>'attachment; filename="formula_'.$f->codigo.'.csv"',
-        ]);
-    }
-
     public function items(int $id)
     {
-        $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta']);
+        // ✅ necesitamos tomas_diarias para la tabla resumen
+        $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta','tomas_diarias']);
+
         $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
 
         $items = FormulaItem::where('codigo', $f->codigo)
@@ -135,53 +126,100 @@ class FormulasEstController extends Controller
             ->orderByDesc('id')
             ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
 
+        // ====== Cálculos resumen (tipo imagen 1–3) ======
+        $tomasDia = (float)($f->tomas_diarias ?? 0);
+        if ($tomasDia <= 0) $tomasDia = 1.0;
+
+        // Celulosa mg/día (editable)
+        $cel = $items->firstWhere('cod_odoo', self::COD_CELULOSA);
+        $celMgDia = $cel ? (float)($cel->cantidad ?? 0) : 0.0;
+
+        // Total principios activos (mg/día) excluyendo celulosa:
+        // Usamos masa_mes (g/mes) -> mg/día = (g/mes*1000)/30
+        $totalPrincipiosMgDia = 0.0;
+
+        foreach ($items as $it) {
+            if ((int)$it->cod_odoo === self::COD_CELULOSA) continue;
+
+            // si tiene masa_mes, es “pesado” (incluye probióticos aunque unidad sea UFC)
+            if (!is_null($it->masa_mes)) {
+                $mgDia = (((float)$it->masa_mes) * 1000.0) / 30.0;
+                $totalPrincipiosMgDia += $mgDia;
+            }
+        }
+
+        $dosisPorCapsMg = $totalPrincipiosMgDia / $tomasDia;
+        $celPorCapsMg   = $celMgDia / $tomasDia;
+        $contenidoCaps  = $dosisPorCapsMg + $celPorCapsMg;
+
+        // Presentación: detectar cápsulas (und/mes)
+        $capsMes = 0.0;
+        $capsItem = $items->first(function($it){
+            $cod = (int)$it->cod_odoo;
+            $name = mb_strtolower((string)$it->activo);
+            return in_array($cod, self::CAPSULA_CODES_FALLBACK, true) || str_contains($name, 'capsul');
+        });
+        if ($capsItem) {
+            $capsMes = (float)($capsItem->cantidad ?? 0);
+        }
+
+        $resumen = [
+            'total_principios_mg_dia' => $totalPrincipiosMgDia,
+            'dosis_caps_mg'           => $dosisPorCapsMg,
+            'celulosa_caps_mg'        => $celPorCapsMg,
+            'contenido_caps_mg'       => $contenidoCaps,
+            'presentacion_caps'       => $capsMes,
+            'dosificacion_caps_dia'   => $tomasDia,
+        ];
+
         return view('fe.items', [
-            'f'     => $f,
-            'items' => $items,
+            'f'       => $f,
+            'items'   => $items,
+            'resumen' => $resumen,
         ]);
     }
 
     /**
-     * ✅ NUEVO: Actualiza celulosa (cod 3291) en mg/día y recalcula masa_mes (g/mes)
+     * Actualiza celulosa (3291) en mg/día y recalcula masa_mes (g/mes)
      * masa_mes = (mg_dia * 30) / 1000
      */
     public function updateCelulosa(Request $request, int $id)
     {
-        // $id = id de Formula
         $data = $request->validate([
             'mg_dia' => ['required', 'numeric', 'min:0'],
         ]);
 
         $formula = Formula::findOrFail($id);
 
-        // buscamos el item 3291 de esa fórmula por codigo
         $item = FormulaItem::where('codigo', $formula->codigo)
-            ->where('cod_odoo', 3291)
+            ->where('cod_odoo', self::COD_CELULOSA)
             ->first();
 
         if (!$item) {
             return response()->json(['ok' => false, 'message' => 'No se encontró el ítem 3291 (celulosa) en esta fórmula.'], 404);
         }
 
-        $mgDia = (float)$data['mg_dia'];
+        $mgDia  = (float)$data['mg_dia'];
+        $masaG  = ($mgDia * 30.0) / 1000.0;
 
-        // Reglas:
-        // - cantidad se guarda como mg/día (porque tu tabla la muestra como "Cantidad" con unidad mg)
-        // - masa_mes se guarda como g/mes => (mg/día * 30) / 1000
-        $masaG = ($mgDia * 30.0) / 1000.0;
-
-        $item->cantidad = $mgDia;
+        $item->cantidad = $mgDia;  // mg/día
         $item->unidad   = 'mg';
-        $item->masa_mes = $masaG;
+        $item->masa_mes = $masaG;  // g/mes
         $item->save();
+
+        // devolvemos también datos para refrescar el resumen
+        $tomasDia = (float)($formula->tomas_diarias ?? 0);
+        if ($tomasDia <= 0) $tomasDia = 1.0;
+
+        $celPorCaps = $mgDia / $tomasDia;
 
         return response()->json([
             'ok' => true,
             'mg_dia' => $mgDia,
             'masa_g' => round($masaG, 4),
+            'celulosa_caps_mg' => round($celPorCaps, 2),
         ]);
     }
-
 
     public function itemsExportXlsx(int $id)
     {
@@ -205,17 +243,22 @@ class FormulasEstController extends Controller
         $r = 2;
         foreach ($rows as $it) {
             $u = strtolower((string)$it->unidad);
-            $esMasa = in_array($u, ['mg','mcg','ui','g'], true);
+
+            // ✅ IMPORTANTE: probióticos (UFC) se exportan como masa (g) usando masa_mes
+            $esMasa = in_array($u, ['mg','mcg','ui','g','ufc'], true);
 
             $cantidadExport = $esMasa
-                ? (float)($it->masa_mes ?? 0) // exporta en g (mes)
+                ? (float)($it->masa_mes ?? 0) // g/mes
                 : (float)($it->cantidad ?? 0);
 
-            $unidadExport = $esMasa ? 'g' : (($u === 'und') ? 'Unidades' : ($it->unidad ?? ''));
+            $unidadExport = $esMasa
+                ? 'g'
+                : (($u === 'und') ? 'Unidades' : ($it->unidad ?? ''));
 
             $sheet->setCellValue("A{$r}", (int)$it->cod_odoo);
             $sheet->setCellValue("B{$r}", $cantidadExport);
             $sheet->setCellValue("C{$r}", $unidadExport);
+
             $sheet->getStyle("B{$r}")->getNumberFormat()->setFormatCode('0.0000');
             $r++;
         }
@@ -253,6 +296,60 @@ class FormulasEstController extends Controller
         $f->save();
 
         return response()->json(['ok' => true]);
+    }
+
+    public function itemsPrint(int $id)
+    {
+        $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta','tomas_diarias']);
+
+        $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
+
+        $items = FormulaItem::where('codigo', $f->codigo)
+            ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
+            ->orderByDesc('id')
+            ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
+
+        $tomasDia = (float)($f->tomas_diarias ?? 0);
+        if ($tomasDia <= 0) $tomasDia = 1.0;
+
+        $cel = $items->firstWhere('cod_odoo', self::COD_CELULOSA);
+        $celMgDia = $cel ? (float)($cel->cantidad ?? 0) : 0.0;
+
+        $totalPrincipiosMgDia = 0.0;
+        foreach ($items as $it) {
+            if ((int)$it->cod_odoo === self::COD_CELULOSA) continue;
+            if (!is_null($it->masa_mes)) {
+                $mgDia = (((float)$it->masa_mes) * 1000.0) / 30.0;
+                $totalPrincipiosMgDia += $mgDia;
+            }
+        }
+
+        $dosisPorCapsMg = $totalPrincipiosMgDia / $tomasDia;
+        $celPorCapsMg   = $celMgDia / $tomasDia;
+        $contenidoCaps  = $dosisPorCapsMg + $celPorCapsMg;
+
+        $capsMes = 0.0;
+        $capsItem = $items->first(function($it){
+            $cod  = (int)$it->cod_odoo;
+            $name = mb_strtolower((string)$it->activo);
+            return in_array($cod, self::CAPSULA_CODES_FALLBACK, true) || str_contains($name, 'capsul');
+        });
+        if ($capsItem) $capsMes = (float)($capsItem->cantidad ?? 0);
+
+        $resumen = [
+            'total_principios_mg_dia' => $totalPrincipiosMgDia,
+            'dosis_caps_mg'           => $dosisPorCapsMg,
+            'celulosa_caps_mg'        => $celPorCapsMg,
+            'contenido_caps_mg'       => $contenidoCaps,
+            'presentacion_caps'       => $capsMes,
+            'dosificacion_caps_dia'   => $tomasDia,
+        ];
+
+        return view('fe.items_print', [
+            'f'       => $f,
+            'items'   => $items,
+            'resumen' => $resumen,
+        ]);
     }
 
 }

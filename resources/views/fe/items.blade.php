@@ -3,7 +3,11 @@
 
 @section('content')
 
-<div class="card">
+@php
+  $r = $resumen ?? [];
+@endphp
+
+<div class="card mb-3">
   <div class="card-body">
 
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -14,10 +18,69 @@
 
       <div class="d-flex gap-2">
         <a href="{{ route('fe.index') }}" class="btn btn-secondary btn-sm">Regresar</a>
+        <a href="{{ route('fe.items.print', $f->id) }}" target="_blank" class="btn btn-dark btn-sm">
+          Imprimir
+        </a>
         <a href="{{ route('fe.items.export', $f->id) }}" class="btn btn-success btn-sm">Exportar</a>
       </div>
     </div>
 
+    {{-- ====== Resumen tipo imagen (1-3) ====== --}}
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered align-middle">
+        <tbody>
+          <tr class="table-success">
+            <th style="width:260px">TOTAL PRINCIPIOS ACTIVOS</th>
+            <td class="text-end" id="sum-principios">
+              {{ number_format((float)($r['total_principios_mg_dia'] ?? 0), 2, '.', '') }}
+            </td>
+            <td style="width:80px">mg</td>
+          </tr>
+
+          <tr>
+            <th>Dosis diaria para 1 cápsula</th>
+            <td class="text-end" id="dose-caps">
+              {{ number_format((float)($r['dosis_caps_mg'] ?? 0), 2, '.', '') }}
+            </td>
+            <td>mg</td>
+          </tr>
+
+          <tr>
+            <th>Celulosa microcristalina (Avicel PH10)</th>
+            <td class="text-end" id="cel-caps">
+              {{ number_format((float)($r['celulosa_caps_mg'] ?? 0), 2, '.', '') }}
+            </td>
+            <td>mg</td>
+          </tr>
+
+          <tr>
+            <th>Contenido total para cápsula 0</th>
+            <td class="text-end" id="total-caps">
+              {{ number_format((float)($r['contenido_caps_mg'] ?? 0), 2, '.', '') }}
+            </td>
+            <td>mg</td>
+          </tr>
+
+          <tr class="table-success">
+            <th>PRESENTACIÓN:</th>
+            <td class="text-end">
+              {{ number_format((float)($r['presentacion_caps'] ?? 0), 0, '.', '') }}
+            </td>
+            <td>cápsulas</td>
+          </tr>
+
+          <tr class="table-success">
+            <th>DOSIFICACIÓN:</th>
+            <td class="text-end" id="tomas-dia">
+              {{ number_format((float)($r['dosificacion_caps_dia'] ?? 0), 0, '.', '') }}
+            </td>
+            <td>cápsulas diarias</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {{-- ====== Tabla ítems ====== --}}
     <div class="table-responsive">
       <table class="table table-bordered table-sm align-middle">
         <thead class="table-light">
@@ -52,7 +115,7 @@
                     value="{{ number_format((float)$it->cantidad, 2, '.', '') }}"
                   >
                 @else
-                  {{ number_format((float)$it->cantidad, 2) }}
+                  {{ number_format((float)$it->cantidad, 2, '.', '') }}
                 @endif
               </td>
 
@@ -87,16 +150,23 @@
 
 <script>
 (function(){
-  const csrf = '{{ csrf_token() }}';
+  const csrf   = '{{ csrf_token() }}';
   const urlSave = @json(route('fe.updateCelulosa', $f->id));
+  const tomasDia = parseFloat(document.getElementById('tomas-dia')?.textContent || '1') || 1;
+
+  function toNum(v){
+    const n = parseFloat((v ?? '').toString().replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+  function fmt2(n){ return (Math.round(n * 100) / 100).toFixed(2); }
 
   document.querySelectorAll('.btn-save-celulosa').forEach(btn => {
     btn.addEventListener('click', async function(){
       const tr = this.closest('tr');
       const input = tr.querySelector('.celulosa-mg');
-      const mgDia = parseFloat((input.value || '').toString().replace(',', '.'));
+      const mgDia = toNum(input.value);
 
-      if (Number.isNaN(mgDia) || mgDia < 0) {
+      if (!Number.isFinite(mgDia) || mgDia < 0) {
         alert('Valor inválido. Ingresa mg/día >= 0.');
         return;
       }
@@ -121,8 +191,16 @@
           return;
         }
 
-        // refrescar masa g en UI
+        // refrescar masa g en la fila
         tr.querySelector('.masa-g').textContent = (data.masa_g ?? 0).toFixed(4);
+
+        // refrescar bloque resumen (celulosa por cápsula y contenido total)
+        const doseCaps = toNum(document.getElementById('dose-caps')?.textContent);
+        const celCaps  = (mgDia / tomasDia);
+        document.getElementById('cel-caps').textContent = fmt2(celCaps);
+
+        const totalCaps = doseCaps + celCaps;
+        document.getElementById('total-caps').textContent = fmt2(totalCaps);
 
         alert('Celulosa actualizada.');
       } catch (e) {

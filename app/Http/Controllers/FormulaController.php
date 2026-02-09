@@ -13,51 +13,39 @@ use Illuminate\Support\Facades\DB;
 class FormulaController extends Controller
 {
     // ===================== Constantes de negocio =====================
-    // Cápsula única de 475 mg (según tu lógica actual)
     private const CAPS_MG_POR_UND = 475;
 
-    // Códigos de inventario
-    private const COD_CAPSULA_465 = 3392; // CÁPSULA 465 mg
-    private const COD_PASTILLERO  = 3396; // PASTILLERO
+    private const COD_CAPSULA_465 = 3392;
+    private const COD_PASTILLERO  = 3396;
 
-    // Insumos por pastillero (existentes)
-    private const COD_TAPA_SEG    = 3397; // Tapa de seguridad
-    private const COD_LINNER      = 3395; // Linner espumado
-    private const COD_ETIQUETA    = 3393; // Etiqueta
+    private const COD_TAPA_SEG    = 3397;
+    private const COD_LINNER      = 3395;
+    private const COD_ETIQUETA    = 3393;
 
-    // Insumos adicionales por pastillero (nuevos)
     private const COD_EXTRA_1     = 3434;
     private const COD_EXTRA_2     = 3435;
     private const COD_EXTRA_3     = 3436;
 
-    // Relleno
-    private const COD_CELULOSA    = 3291; // CELULOSA
+    private const COD_CELULOSA    = 3291;
 
-    // Regla de capacidad de pastillero (unidades al mes)
     private const PAST_CAP_SMALL = 60;
     private const PAST_CAP_LARGE = 150;
 
     /**
      * Conversiones especiales UI -> mg (por cod_odoo)
-     * - 3388 Vit D3: 1 UI = 0.025 ug = 0.000025 mg
-     * - 3381 Vit A : 1 UI = 0.55 ug  = 0.00055 mg
-     * - 3375 Vit E : 1 UI = 1 mg     = 1 mg
      */
     private const UI_TO_MG = [
-        3388 => 0.000025,
-        3381 => 0.00055,
-        3375 => 1.0,
+        3388 => 0.000025, // Vit D3
+        3381 => 0.00055,  // Vit A
+        3375 => 1.0,      // Vit E
     ];
 
     private const UI_FALLBACK_TO_MG = 0.00067;
 
     // ===================== Probióticos (UFC -> mg) =====================
-    // Potencia UFC por gramo (UFC/g) por cod_odoo
     private const PROBIO_UFC_PER_G = [
-        // 2e10
         3371 => 20000000000,  // SACCHAROMYCES BOULARDII
 
-        // 1e11
         3278 => 100000000000, // BIFIDOBACTERIUM ANIMALIS
         3277 => 100000000000, // BIFIDOBACTERIUM ADOLESCENTIS
         3321 => 100000000000, // LACTOBACILLUS CURVATUS
@@ -68,7 +56,6 @@ class FormulaController extends Controller
         3324 => 100000000000, // LACTOBACILLUS HELVETICUS
         3370 => 100000000000, // LACTOBACILLUS SALIVARIUS
 
-        // 2e11
         3279 => 200000000000, // BIFIDOBACTERIUM BIFIDUM
         3280 => 200000000000, // BIFIDOBACTERIUM BREVE
         3282 => 200000000000, // BIFIDOBACTERIUM LONGUM
@@ -81,6 +68,10 @@ class FormulaController extends Controller
         3281 => 200000000000, // BIFIDOBACTERIUM LACTIS
         3318 => 200000000000, // LACTOBACILLUS ACIDOPHILLUS
     ];
+
+    // Unidades permitidas (UI/UFC/mg/g/mcg)
+    private const UNITS_ALLOWED_BASE = ['mg', 'g', 'mcg', 'UI'];   // para cualquier activo
+    private const UNIT_UFC = 'UFC';                               // solo para probióticos
 
     // ===================== Vistas =====================
     public function index(Request $request)
@@ -132,6 +123,34 @@ class FormulaController extends Controller
         return ($ufc / $pot) * 1000.0;
     }
 
+    // ===================== Normalización de unidades =====================
+    private function normalizeUnit(string $u): string
+    {
+        $u = trim($u);
+        if ($u === '') return 'mg';
+
+        $upper = strtoupper($u);
+
+        if ($upper === 'UFC') return 'UFC';
+        if ($upper === 'UI')  return 'UI';
+
+        $lower = strtolower($u);
+        if (in_array($lower, ['mg','g','mcg'], true)) return $lower;
+
+        return 'mg';
+    }
+
+    private function isUnidadPermitida(string $unidad, int $codOdoo): bool
+    {
+        $unidadNorm = $this->normalizeUnit($unidad);
+
+        if ($unidadNorm === 'UFC') {
+            return $this->isProbiotico($codOdoo);
+        }
+
+        return in_array($unidadNorm, self::UNITS_ALLOWED_BASE, true);
+    }
+
     // ===================== Temporales =====================
     public function agregarTemp(Request $request)
     {
@@ -153,35 +172,28 @@ class FormulaController extends Controller
             return response()->json(['status' => 'ACTIVO_NO_EXISTE'], 422);
         }
 
+        $codOdoo = (int)$activoDB->cod_odoo;
+
         $exists = ActivoTemp::where('user_id', $userId)
-            ->where('cod_odoo', (int)$activoDB->cod_odoo)
+            ->where('cod_odoo', $codOdoo)
             ->exists();
 
         if ($exists) return response()->json(['status' => 'duplicado'], 200);
 
-        $codOdoo = (int)$activoDB->cod_odoo;
-        $unidadReq = strtoupper(trim((string)$request->unidad)); // MG / UFC / UI / etc
-
-        // Default: activos normales => se fuerza unidad oficial de DB
-        $unidadFinal   = (string)$activoDB->unidad;
-        $cantidadFinal = (float)$request->cantidad;
-
-        // Probióticos: permitir que el usuario elija MG o UFC
-        if ($this->isProbiotico($codOdoo)) {
-            if (!in_array($unidadReq, ['MG', 'UFC'], true)) {
-                return response()->json(['status' => 'UNIDAD_INVALIDA'], 422);
-            }
-            // Guardar mg en minúscula (consistencia con tu sistema) y UFC en mayúscula
-            $unidadFinal = ($unidadReq === 'MG') ? 'mg' : 'UFC';
-            $cantidadFinal = (float)$request->cantidad; // mg/día o UFC/día según unidadFinal
+        $unidadReq = (string)$request->unidad;
+        if (!$this->isUnidadPermitida($unidadReq, $codOdoo)) {
+            return response()->json(['status' => 'UNIDAD_INVALIDA'], 422);
         }
+
+        $unidadFinal   = $this->normalizeUnit($unidadReq);
+        $cantidadFinal = (float)$request->cantidad;
 
         ActivoTemp::create([
             'user_id'  => $userId,
             'cod_odoo' => $codOdoo,
             'activo'   => (string)$request->activo,
             'cantidad' => $cantidadFinal,
-            'unidad'   => (string)$unidadFinal,
+            'unidad'   => $unidadFinal,
         ]);
 
         return response()->json(['status' => 'ok', 'unidad' => $unidadFinal]);
@@ -263,7 +275,7 @@ class FormulaController extends Controller
             'mg'  => $cantidad,
             'mcg' => $cantidad / 1000.0,
             'UI'  => $cantidad * (self::UI_TO_MG[$cod_odoo] ?? self::UI_FALLBACK_TO_MG),
-            'UFC' => $this->ufcToMg($cantidad, $cod_odoo), // cantidad = UFC/día
+            'UFC' => $this->ufcToMg($cantidad, $cod_odoo),
             default => 0.0,
         };
     }
@@ -301,10 +313,9 @@ class FormulaController extends Controller
     }
 
     /**
-     * Construye el resumen y retorna filas y metadatos.
      * mode:
      * - 'view': incluye valor_costo y mg_dia
-     * - 'save': incluye masa_mes (g/mes) para guardar items
+     * - 'save': incluye masa_mes (g/mes)
      */
     private function buildCapsuleSummary(int $userId, string $mode = 'view'): array
     {
@@ -331,16 +342,16 @@ class FormulaController extends Controller
         $rows = collect();
         $totalMgDia = 0.0;
 
-        // Activos base
         foreach ($items as $r) {
-            $mgDia = $this->toMgDia((float)$r->cantidad, (string)$r->unidad, (int)$r->cod_odoo);
+            $unidad = $this->normalizeUnit((string)$r->unidad);
+            $mgDia = $this->toMgDia((float)$r->cantidad, $unidad, (int)$r->cod_odoo);
             $totalMgDia += $mgDia;
 
             $row = [
                 'cod_odoo' => (int)$r->cod_odoo,
                 'activo'   => (string)$r->activo,
                 'cantidad' => (float)$r->cantidad,
-                'unidad'   => (string)$r->unidad,
+                'unidad'   => $unidad,
                 'mg_dia'   => $mgDia,
             ];
 
@@ -349,13 +360,12 @@ class FormulaController extends Controller
             }
 
             if ($mode === 'save') {
-                $row['masa_mes'] = (($mgDia * 30.0) / 1000.0); // g/mes
+                $row['masa_mes'] = (($mgDia * 30.0) / 1000.0);
             }
 
             $rows->push($row);
         }
 
-        // Cápsulas por capacidad
         $regla = $this->capsulasPorCapacidad($totalMgDia);
         $capsDia = (int)$regla['caps_dia'];
         $capsMes = (int)$regla['caps_mes'];
@@ -363,7 +373,6 @@ class FormulaController extends Controller
 
         $totalMasaMesBase = ($totalMgDia * 30.0) / 1000.0;
 
-        // Relleno con celulosa hasta el límite diario
         $limiteMgDia  = $capsDia * self::CAPS_MG_POR_UND;
         $rellenoMgDia = max(0.0, $limiteMgDia - $totalMgDia);
 
@@ -387,10 +396,8 @@ class FormulaController extends Controller
             $rows->push($rowCel);
         }
 
-        // Pastillero
         $pastCount = $this->pastillerosNecesarios($capsMes);
 
-        // Cápsulas (und/mes)
         $rowCaps = [
             'cod_odoo' => self::COD_CAPSULA_465,
             'activo'   => $catalogo[self::COD_CAPSULA_465]->nombre ?? 'CÁPSULA 465 mg',
@@ -402,7 +409,6 @@ class FormulaController extends Controller
         if ($mode === 'save') $rowCaps['masa_mes'] = null;
         $rows->push($rowCaps);
 
-        // Pastillero (und)
         $rowPast = [
             'cod_odoo' => self::COD_PASTILLERO,
             'activo'   => $catalogo[self::COD_PASTILLERO]->nombre ?? 'PASTILLERO',
@@ -414,50 +420,43 @@ class FormulaController extends Controller
         if ($mode === 'save') $rowPast['masa_mes'] = null;
         $rows->push($rowPast);
 
-        // Insumos por pastillero
-        // Insumos ligados al pastillero (cantidad = $pastCount)
-$insumosPorPastillero = [
-  [self::COD_TAPA_SEG, 'TAPA DE SEGURIDAD'],
-  [self::COD_LINNER,   'LINNER ESPUMADO'],
-  [self::COD_ETIQUETA, 'ETIQUETA'],
-];
+        $insumosPorPastillero = [
+            [self::COD_TAPA_SEG, 'TAPA DE SEGURIDAD'],
+            [self::COD_LINNER,   'LINNER ESPUMADO'],
+            [self::COD_ETIQUETA, 'ETIQUETA'],
+        ];
 
-foreach ($insumosPorPastillero as [$cod, $fallbackNombre]) {
-  $rowIns = [
-    'cod_odoo' => (int)$cod,
-    'activo'   => $catalogo[(int)$cod]->nombre ?? $fallbackNombre,
-    'cantidad' => (float)$pastCount,
-    'unidad'   => 'und',
-    'mg_dia'   => null,
-  ];
-  if ($withCost) $rowIns['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
-  if ($mode === 'save') $rowIns['masa_mes'] = null;
-  $rows->push($rowIns);
-}
+        foreach ($insumosPorPastillero as [$cod, $fallbackNombre]) {
+            $rowIns = [
+                'cod_odoo' => (int)$cod,
+                'activo'   => $catalogo[(int)$cod]->nombre ?? $fallbackNombre,
+                'cantidad' => (float)$pastCount,
+                'unidad'   => 'und',
+                'mg_dia'   => null,
+            ];
+            if ($withCost) $rowIns['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
+            if ($mode === 'save') $rowIns['masa_mes'] = null;
+            $rows->push($rowIns);
+        }
 
-        // CIF / MOI / MOD siempre 1 (no dependen del pastillero)
         $insumosFijos = [
-        [self::COD_EXTRA_1, 'CIF'],
-        [self::COD_EXTRA_2, 'MOI'],
-        [self::COD_EXTRA_3, 'MOD'],
+            [self::COD_EXTRA_1, 'CIF'],
+            [self::COD_EXTRA_2, 'MOI'],
+            [self::COD_EXTRA_3, 'MOD'],
         ];
 
         foreach ($insumosFijos as [$cod, $fallbackNombre]) {
-        $rowFix = [
-            'cod_odoo' => (int)$cod,
-            'activo'   => $fallbackNombre, // nombre fijo (CIF/MOI/MOD)
-            'cantidad' => 1.0,
-            'unidad'   => 'und',
-            'mg_dia'   => null,
-        ];
-
-        // (opcional) si quieres seguir mostrando costo del catálogo:
-        if ($withCost) $rowFix['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
-        if ($mode === 'save') $rowFix['masa_mes'] = null;
-
-        $rows->push($rowFix);
+            $rowFix = [
+                'cod_odoo' => (int)$cod,
+                'activo'   => $fallbackNombre,
+                'cantidad' => 1.0,
+                'unidad'   => 'und',
+                'mg_dia'   => null,
+            ];
+            if ($withCost) $rowFix['valor_costo'] = (float)($catalogo[(int)$cod]->valor_costo ?? 0);
+            if ($mode === 'save') $rowFix['masa_mes'] = null;
+            $rows->push($rowFix);
         }
-
 
         return [
             'rows'          => $rows,
@@ -648,11 +647,13 @@ foreach ($insumosPorPastillero as [$cod, $fallbackNombre]) {
                 if (preg_match($regexExcluir, $nombre)) continue;
 
                 $unidad   = $it->unidad ?: 'mg';
+                $unidad   = $this->normalizeUnit((string)$unidad);
                 $cantidad = null;
 
                 if (!is_null($it->cantidad) && $unidad !== 'und') {
                     $cantidad = (float)$it->cantidad;
                 } elseif (!is_null($it->masa_mes)) {
+                    // masa_mes está en g/mes -> convertir a mg/día para edición
                     $cantidad = ((float)$it->masa_mes * 1000.0) / 30.0;
                     $unidad   = 'mg';
                 } else {

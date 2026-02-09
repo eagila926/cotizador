@@ -2,7 +2,6 @@
 
 @push('styles')
 <style>
-  /* < md (menos de 768px) */
   @media (max-width: 767.98px) {
     #tablaFormula th:nth-child(1),
     #tablaFormula td:nth-child(1),
@@ -20,6 +19,7 @@
   <div class="card">
     <div class="card-body">
       <h5 class="card-title mb-2">Ingrese los activos de la fórmula</h5>
+
       <div class="row">
         <div class="col-lg-12">
           <form>
@@ -55,7 +55,6 @@
           <button type="button" id="btnAdd" class="btn btn-primary" onclick="agregarFila();">Añadir</button>
         </div>
 
-        {{-- === Total + Botones de cotización === --}}
         <div class="row align-items-center mt-3">
           <div class="col-lg-10">
             <h5 id="total" class="mb-0">Total: 0.00 mg</h5>
@@ -64,7 +63,6 @@
             <button type="button" id="btnCapsulas" class="btn btn-success w-100">Cotizar</button>
           </div>
         </div>
-        {{-- === /Total + Botones === --}}
       </div>
 
       <div class="row" style="margin-top: 10px;">
@@ -88,10 +86,11 @@
                 </thead>
                 <tbody></tbody>
               </table>
-            </div><!-- end card body -->
-          </div><!-- end card -->
-        </div><!-- end col -->
-      </div><!-- end row -->
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 @endsection
@@ -154,14 +153,50 @@
     return ui * f;
   }
 
+  // ===== Unidades disponibles para UI =====
+  function buildUnitOptions(isProbio, selected) {
+    const base = [
+      {v:'mg',  t:'mg'},
+      {v:'g',   t:'g'},
+      {v:'mcg', t:'mcg'},
+      {v:'UI',  t:'UI'},
+    ];
+
+    if (isProbio) base.push({v:'UFC', t:'UFC'});
+
+    selected = (selected || 'mg').toString().trim();
+    // normalizar selected para que empate con opciones
+    const up = selected.toUpperCase();
+    if (up === 'UFC') selected = 'UFC';
+    else if (up === 'UI') selected = 'UI';
+    else selected = selected.toLowerCase();
+
+    // si selected no existe en la lista, default mg
+    const exists = base.some(o => o.v === selected);
+    if (!exists) selected = isProbio ? 'mg' : 'mg';
+
+    return base.map(o => `<option value="${o.v}" ${o.v===selected?'selected':''}>${o.t}</option>`).join('');
+  }
+
+  function stepByUnit(u) {
+    u = (u || '').toString().trim();
+    if (u === 'UFC') return 1;
+    if (u === 'g')   return 0.0001;
+    if (u === 'mcg') return 1;
+    if (u === 'UI')  return 1;
+    return 0.01; // mg
+  }
+
   // Buscar (sugerencias)
   function buscarActivo(valor) {
     if (!valor || valor.length < 1) {
       $('#resultados-activos').hide().empty();
       return;
     }
+
     $.post("{{ route('formulas.buscar') }}", { producto: valor }, function (data) {
       if (!data) { $('#resultados-activos').hide().empty(); return; }
+
       $('#resultados-activos').show().html(data);
 
       $('.suggest-element').off('click').on('click', function () {
@@ -172,55 +207,39 @@
         const maxRaw = $(this).data('maximo');
         const minNum = (minRaw === '' || minRaw === null || isNaN(Number(minRaw))) ? null : Number(minRaw);
         const maxNum = (maxRaw === '' || maxRaw === null || isNaN(Number(maxRaw))) ? null : Number(maxRaw);
-        const unidadBase = (($(this).data('unidad') || 'mg') + '').trim().toLowerCase();
+
+        const unidadDB = (($(this).data('unidad') || 'mg') + '').trim();
+        const unidadBase = unidadDB.toLowerCase() === 'mcg' ? 'mcg' : (unidadDB.toLowerCase() === 'g' ? 'g' : 'mg');
 
         const codNum = parseInt(cod, 10);
         const isProbio = PROBIO_CODES.has(codNum);
 
         $('#activo').val(nombre).data('cod_odoo', cod);
 
-        // min/max (solo informativo). Para probióticos no tiene mucho sentido en UFC, así que lo dejamos con unidadBase.
         const fmtUM = (v, u) => (v === null ? '—' : `${v} ${u}`);
         $('#minMaxLabel').text(`Mínimo: ${fmtUM(minNum, unidadBase)} ; Máximo: ${fmtUM(maxNum, unidadBase)}`);
 
-        // Step recomendado
-        let step = (unidadBase === 'mcg') ? 1 : (unidadBase === 'mg' ? 0.01 : 1);
+        // Unidades: siempre mostrar todas (y UFC solo probióticos)
+        const selected = isProbio ? 'mg' : unidadBase;
+        $('#unidad')
+          .html(buildUnitOptions(isProbio, selected))
+          .prop('disabled', false);
 
-        // En probióticos, dejamos el input listo para mg por defecto
-        if (isProbio) {
-          $('#unidad')
-            .html(`
-              <option value="mg" selected>mg</option>
-              <option value="UFC">UFC</option>
-            `)
-            .prop('disabled', false);
-
-          step = 0.01; // mg por defecto
-        } else {
-          $('#unidad')
-            .html(`<option value="${unidadBase}" selected>${unidadBase}</option>`)
-            .prop('disabled', true);
-        }
-
+        const uSel = $('#unidad').val();
         $('#cant')
           .attr('min', minNum === null ? '' : minNum)
           .attr('max', maxNum === null ? '' : maxNum)
-          .attr('step', step);
+          .attr('step', stepByUnit(uSel));
 
         $('#resultados-activos').hide();
       });
-
     });
   }
 
-  // Si cambian unidad a UFC, ajusta step
+  // Ajustar step cuando cambie la unidad
   $('#unidad').on('change', function() {
     const u = ($('#unidad').val() || '').trim();
-    if (u === 'UFC') {
-      $('#cant').attr('step', 1); // UFC enteros
-    } else if (u === 'mg') {
-      $('#cant').attr('step', 0.01);
-    }
+    $('#cant').attr('step', stepByUnit(u));
   });
 
   // Listar tabla
@@ -307,7 +326,7 @@
   // Cargar al entrar
   document.addEventListener('DOMContentLoaded', mostrarActivos);
 
-  // === TOTAL EN MG (incluye UFC para probióticos) ===
+  // === TOTAL EN MG (incluye UI/UFC/mcg/g) ===
   function verificarCondiciones() {
     $.get("{{ route('formulas.listar') }}?json=1", function (activos) {
       const codigosProhibidos = [4520, 1205, 1044, 1086, 70136, 1163];
@@ -324,20 +343,15 @@
 
         switch (unidad) {
           case 'mg':
-            cantidadMg = cantidad;
-            break;
+            cantidadMg = cantidad; break;
           case 'mcg':
-            cantidadMg = cantidad / 1000;
-            break;
+            cantidadMg = cantidad / 1000; break;
           case 'g':
-            cantidadMg = cantidad * 1000;
-            break;
+            cantidadMg = cantidad * 1000; break;
           case 'UI':
-            cantidadMg = uiToMg(cantidad, codOdoo);
-            break;
+            cantidadMg = uiToMg(cantidad, codOdoo); break;
           case 'UFC':
-            cantidadMg = ufcToMg(cantidad, codOdoo);
-            break;
+            cantidadMg = ufcToMg(cantidad, codOdoo); break;
           default:
             cantidadMg = 0;
         }
@@ -356,7 +370,7 @@
     });
   }
 
-  // Llama verificarCondiciones cada vez que recargas la tabla
+  // Hook a mostrarActivos
   const __oldMostrarActivos = mostrarActivos;
   window.mostrarActivos = function() {
     __oldMostrarActivos();
