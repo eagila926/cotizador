@@ -14,7 +14,6 @@
     }
     $medicoCorto = nombreCorto($medicoPrefill);
 
-    // Helpers de vista
     function abreviarNombreActivoView($nombre) {
         $nombre = preg_replace('/\s*\(.*?\)\s*/', '', (string)$nombre);
         if (stripos($nombre, 'BIFIDUMBACTERIUM') === 0) {
@@ -25,142 +24,146 @@
         return $nombre;
     }
 
-    // Excluir auxiliares (códigos nuevos + compat)
-    $excluir = [3740,3742,3744,3743,3739,1078,1077,1219,70276,70271,71497];
-    $items  = $items ?? $formula->items->filter(fn($it) => !in_array((int)$it->cod_odoo, $excluir))->values();
+    // ✅ cantidad: sin .00 y recorta ceros
+    function fmtCantidad($v, $maxDec = 2) {
+        if (!is_numeric($v)) return (string)$v;
+        $n = (float)$v;
+        $s = number_format($n, $maxDec, '.', '');
+        $s = rtrim(rtrim($s, '0'), '.');
+        return $s === '' ? '0' : $s;
+    }
 
+    // Columnas equilibradas
+    $items = $items ?? collect();
     $totalActivos = $items->count();
 
-    // Espaciado extra
+    $espaciadoExtra = '';
     if ($totalActivos >= 1 && $totalActivos <= 4) {
         $espaciadoExtra = 'margin-top: 60px; margin-bottom: 40px;';
     } elseif ($totalActivos >= 5 && $totalActivos <= 10) {
         $espaciadoExtra = 'margin-top: 30px; margin-bottom: 20px;';
-    } else {
-        $espaciadoExtra = '';
     }
 
-    // Columnas
     $columnas = 2;
     if ($totalActivos >= 16 && $totalActivos <= 30) $columnas = 3;
 
-    // Partir ítems en columnas equilibradas
-    $porCol   = max(1, (int) ceil($totalActivos / $columnas));
-    $chunks   = $items->chunk($porCol);
+    $porCol = max(1, (int) ceil($totalActivos / $columnas));
+    $chunks = $items->chunk($porCol);
 
     // Pie
-    $tomas   = (int) ($formula->tomas_diarias ?? 3);
-    $dias    = 30;
+    $tomas = (int) ($formula->tomas_diarias ?? 3);
+    $dias  = 30;
     $contieneCaps = $tomas * $dias;
 
-    // Título dinámico
+    // Título
     $nombreEtiqueta = (string) ($formula->nombre_etiqueta ?? '');
-    $fontSizeTitulo = (strlen($nombreEtiqueta) > 31) ? '25px' : '28px';
+    $fontSizeTitulo = (mb_strlen($nombreEtiqueta) > 31) ? '25px' : '28px';
 
-    $qf               = $qf ?? 'Q.F. Jose Perez';
+    $qf = $qf ?? 'Q.F. Jose Perez';
     $fechaElaboracion = $fechaElaboracion ?? now()->format('d-m-Y');
 @endphp
+
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <title>Etiqueta – {{ $formula->codigo }}</title>
 <style>
-    body { font-family: Helvetica, Arial, sans-serif; margin: 22px; }
-    .container { width: 90%; margin: 0 auto; }
-    .row { display: flex; justify-content: space-between; margin-bottom: 2px; gap: 12px; }
-    .col { flex: 1; padding: 1px; font-size: 21px; }
-    .col-half { width: 65%; }
-    .header { text-align: left; margin-top: 10px; margin-left: 390px; font-weight: bold; margin-bottom: 45px; }
-    .footer { margin-top: 10px; font-size: 25px; }
+  body { font-family: Helvetica, Arial, sans-serif; margin: 22px; }
+  .container { width: 90%; margin: 0 auto; }
 
-    .editable { border-bottom: 1px dashed #bbb; padding: 2px 4px; display: inline-block; }
-    .editable:focus { outline: 2px solid #ddeaff; border-bottom-color: transparent; }
-    .nombre-etiqueta { font-size: {{ $fontSizeTitulo }}; font-weight: 700; background: transparent; width: 100%; text-align: left; }
-    .pte { font-weight: bold; font-size: 20px; background: transparent; width: 100%; text-align: left; }
-    .so  { font-weight: bold; font-size: 24px; background: transparent; width: 100%; text-align: left; }
+  .row { display: flex; justify-content: space-between; margin-bottom: 2px; gap: 12px; }
+  .col { flex: 1; padding: 1px; font-size: 21px; }
 
-    .comp-row { display:flex; justify-content:space-between; margin: 2px 0; }
-    .comp-nombre { font-weight: bold; font-size: 20px; }
-    .comp-cant   { text-align: right; font-weight: bold; font-size: 20px; }
+  .header { text-align: left; margin-top: 10px; margin-left: 390px; font-weight: bold; margin-bottom: 45px; }
+  .footer { margin-top: 10px; font-size: 25px; }
 
-    @media print {
-      .editable { border: none !important; }
-    }
+  .editable { border-bottom: 1px dashed #bbb; padding: 2px 4px; display: inline-block; }
+  .editable:focus { outline: 2px solid #ddeaff; border-bottom-color: transparent; }
+
+  .nombre-etiqueta { font-size: {{ $fontSizeTitulo }}; font-weight: 700; background: transparent; width: 100%; text-align: left; }
+  .pte { font-weight: bold; font-size: 20px; background: transparent; width: 100%; text-align: left; }
+  .so  { font-weight: bold; font-size: 24px; background: transparent; width: 100%; text-align: left; }
+
+  .comp-row { display:flex; justify-content:space-between; margin: 2px 0; gap: 10px; }
+  .comp-nombre { font-weight: bold; font-size: 20px; max-width: 70%; }
+  .comp-cant { text-align: right; font-weight: bold; font-size: 20px; display:flex; justify-content:flex-end; gap: 8px; white-space: nowrap; }
+
+  @media print {
+    .editable { border: none !important; }
+  }
 </style>
 </head>
 <body>
 
 <div class="container">
-    {{-- Título (EDITABLE) --}}
-    <div class="header">
-        <div class="editable nombre-etiqueta" contenteditable="true">
-            {{ $nombreEtiqueta }}
-        </div>
-    </div>
+  {{-- Título --}}
+  <div class="header">
+    <div class="editable nombre-etiqueta" contenteditable="true">{{ $nombreEtiqueta }}</div>
+  </div>
 
-    {{-- Paciente y Código (EDITABLES) --}}
-    <div class="row">
-        <div class="editable pte" contenteditable="true">
-            PTE: {{ $pacientePrefill ?? ($formula->paciente ?? '-') }}
-        </div>
-        <div class="editable pte" contenteditable="true" style="text-align:center;">
-            {{ $formula->codigo }}
-        </div>
+  {{-- Paciente y Código --}}
+  <div class="row">
+    <div class="editable pte" contenteditable="true">
+      PTE: {{ $pacientePrefill ?? ($formula->paciente ?? '-') }}
     </div>
+    <div class="editable pte" contenteditable="true" style="text-align:center;">
+      {{ $formula->codigo }}
+    </div>
+  </div>
 
-    {{-- Composición (NO editable) --}}
-    <div class="row" style="{{ $espaciadoExtra }}">
-        @foreach($chunks as $col)
-            <div class="col col-half" style="width: {{ floor(100 / $columnas) }}%; padding-right: 15px;">
-                @foreach($col as $it)
-                    <div class="comp-row">
-                        <div class="comp-nombre">
-                            {{ abreviarNombreActivoView($it->activo) }}
-                        </div>
-                        <div class="comp-cant">
-                            {{ number_format((float)$it->cantidad, 2) }} {{ $it->unidad ?? 'mg' }}
-                        </div>
-                    </div>
-                @endforeach
+  {{-- Composición (EDITABLE TODO) --}}
+  <div class="row" style="{{ $espaciadoExtra }}">
+    @foreach($chunks as $col)
+      <div class="col" style="width: {{ floor(100 / $columnas) }}%; padding-right: 15px;">
+        @foreach($col as $it)
+          <div class="comp-row">
+            <div class="comp-nombre editable" contenteditable="true">
+              {{ abreviarNombreActivoView($it->activo) }}
             </div>
+
+            <div class="comp-cant">
+              <span class="editable js-num-dec" contenteditable="true">{{ fmtCantidad($it->cantidad, 2) }}</span>
+              <span class="editable" contenteditable="true">{{ $it->unidad ?? 'mg' }}</span>
+            </div>
+          </div>
         @endforeach
-    </div>
+      </div>
+    @endforeach
+  </div>
 
-    {{-- Pie (todos EDITABLES) --}}
-    <div class="footer" style="{{ $espaciadoExtra }}">
-        <div class="row" style="align-items:flex-start;">
-            <div class="col">
-                <div>
-                  <strong>DR.(A):
-                    <span class="editable" contenteditable="true">
-                      {{ $medicoCorto ?? ($formula->medico ?? '-') }}
-                    </span>
-                  </strong>
-                </div>
-
-                <div>
-                    <strong>CONTIENE: </strong>
-                    <strong><span class="editable js-only-numbers" contenteditable="true">{{ $contieneCaps }}</span>
-                     CÁPSULAS</strong>
-                </div>
-
-                <div>
-                    <strong>POSOLOGÍA: TOMAR </strong>
-                    <strong><span class="editable js-only-numbers" contenteditable="true">{{ $tomas }}</span>
-                     CÁPSULAS DIARIAS</strong>
-                </div>
-            </div>
-
-            <div class="col" style="text-align:left;">
-                <div><strong class="editable" contenteditable="true">{{ $qf }}</strong></div>
-                <div><strong>ELAB: <span class="editable" contenteditable="true">{{ $fechaElaboracion }}</span></strong></div>
-                <div class="editable so" contenteditable="true">
-                  SO.@if($soPrefill) {{ ' ' . $soPrefill }} @endif
-                </div>
-            </div>
+  {{-- Pie --}}
+  <div class="footer" style="{{ $espaciadoExtra }}">
+    <div class="row" style="align-items:flex-start;">
+      <div class="col">
+        <div>
+          <strong>DR.(A):
+            <span class="editable" contenteditable="true">
+              {{ $medicoCorto ?? ($formula->medico ?? '-') }}
+            </span>
+          </strong>
         </div>
+
+        <div>
+          <strong>CONTIENE: </strong>
+          <strong><span class="editable js-only-numbers" contenteditable="true">{{ $contieneCaps }}</span> CÁPSULAS</strong>
+        </div>
+
+        <div>
+          <strong>POSOLOGÍA: TOMAR </strong>
+          <strong><span class="editable js-only-numbers" contenteditable="true">{{ $tomas }}</span> CÁPSULAS DIARIAS</strong>
+        </div>
+      </div>
+
+      <div class="col" style="text-align:left;">
+        <div><strong class="editable" contenteditable="true">{{ $qf }}</strong></div>
+        <div><strong>ELAB: <span class="editable" contenteditable="true">{{ $fechaElaboracion }}</span></strong></div>
+        <div class="editable so" contenteditable="true">
+          SO.@if($soPrefill) {{ ' ' . $soPrefill }} @endif
+        </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
@@ -171,7 +174,7 @@
     });
   });
 
-  // Limitar a números los campos marcados
+  // Solo enteros
   document.querySelectorAll('.js-only-numbers').forEach(el => {
     el.addEventListener('input', () => {
       el.textContent = (el.textContent || '').replace(/[^\d]/g, '');
@@ -183,6 +186,28 @@
       document.execCommand('insertText', false, clean);
     });
   });
+
+  // Números con decimal opcional (1 punto)
+  document.querySelectorAll('.js-num-dec').forEach(el => {
+    const clean = (txt) => {
+      txt = (txt || '').replace(/,/g, '.');
+      txt = txt.replace(/[^\d.]/g, '');
+      const parts = txt.split('.');
+      if (parts.length > 2) txt = parts[0] + '.' + parts.slice(1).join('');
+      return txt;
+    };
+
+    el.addEventListener('input', () => {
+      el.textContent = clean(el.textContent);
+    });
+
+    el.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, clean(text));
+    });
+  });
 </script>
+
 </body>
 </html>

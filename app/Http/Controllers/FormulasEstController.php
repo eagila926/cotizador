@@ -13,18 +13,45 @@ class FormulasEstController extends Controller
 {
     private const SESSION_KEY = 'fe_items';
 
-    // Ajusta estos códigos a tus “insumos al final”.
+    // “Insumos al final” (ajusta a tu realidad)
     private const NEW_END_CODES = [3994, 3796, 3397, 3395, 3393];
     private const OLD_END_CODES = [70274,70272,70275,70273,1101,1078,1077,1219,70276,70271,71497];
 
     private const COD_CELULOSA = 3291;
 
+    // ✅ EXCLUSIÓN PARA IMPRESIÓN (etiqueta)
+    // (incluye lo que mencionaste: capsula/pastillero/auxiliares)
     private const PRINT_EXCLUDE_CODES = [
-        3392, 3396, 3398, 3395, 3393, 3434, 3435, 3436,
+        3740,3742,3744,3743,3739,
+        1078,1077,1219,70276,70271,71497,
+        3436,3435,3434,
+        3393,3395,3398,3396,3392,3394,3291
     ];
 
-    // Para detectar “cápsula” en caso de que tus códigos varíen
+    // Detección fallback cápsula (si luego lo necesitas)
     private const CAPSULA_CODES_FALLBACK = [3392, 3994, 70274];
+
+    // =============== Helpers internos ===============
+
+    private static function endCodes(): array
+    {
+        return array_values(array_unique(array_merge(self::NEW_END_CODES, self::OLD_END_CODES)));
+    }
+
+    private static function printExcludeCodes(): array
+    {
+        return self::PRINT_EXCLUDE_CODES;
+    }
+
+    private static function filterForPrint($items)
+    {
+        $excluir = self::printExcludeCodes();
+        return $items
+            ->reject(fn($it) => in_array((int)($it->cod_odoo ?? 0), $excluir, true))
+            ->values();
+    }
+
+    // =============== CRUD pantalla establecidas ===============
 
     public function index(Request $request)
     {
@@ -99,53 +126,56 @@ class FormulasEstController extends Controller
         return back();
     }
 
+    // =============== IMPRESIÓN etiqueta ===============
+
+    /**
+     * Etiqueta genérica (impresión)
+     * - Carga items por relación
+     * - Excluye PRINT_EXCLUDE_CODES
+     * - Retorna view etiquetas.generica
+     */
     public function print(Request $request, int $id)
     {
         $formula = Formula::with('items')->findOrFail($id);
 
-        $excluir = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
-        $itemsComposicion = $formula->items
-            ->filter(fn($it) => !in_array((int)$it->cod_odoo, $excluir, true))
-            ->values();
+        // ✅ Base items: preferimos relación (ya la tienes)
+        $itemsAll = $formula->items->values();
+
+        // ✅ Filtrado real para impresión
+        $itemsPrint = self::filterForPrint($itemsAll);
 
         $qf = 'Q.F. Jose Perez';
 
         return view('etiquetas.generica', [
             'formula'           => $formula,
-            'items'             => $itemsComposicion,
+            'items'             => $itemsPrint, // ✅ ya filtrados
             'qf'                => $qf,
             'fechaElaboracion'  => now()->format('d-m-Y'),
         ]);
     }
 
+    // =============== Vista items/resumen (lo mantengo) ===============
+
     public function items(int $id)
     {
-        // ✅ necesitamos tomas_diarias para la tabla resumen
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta','tomas_diarias']);
 
-        $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
+        $endCodes = self::endCodes();
 
         $items = FormulaItem::where('codigo', $f->codigo)
             ->orderByRaw('CASE WHEN cod_odoo = 3291 THEN 1 ELSE 0 END ASC')
-            ->orderBy('id', 'ASC') // o tu orden actual (created_at, etc.)
+            ->orderBy('id', 'ASC')
             ->get();
 
-        // ====== Cálculos resumen (tipo imagen 1–3) ======
         $tomasDia = (float)($f->tomas_diarias ?? 0);
         if ($tomasDia <= 0) $tomasDia = 1.0;
 
-        // Celulosa mg/día (editable)
         $cel = $items->firstWhere('cod_odoo', self::COD_CELULOSA);
         $celMgDia = $cel ? (float)($cel->cantidad ?? 0) : 0.0;
 
-        // Total principios activos (mg/día) excluyendo celulosa:
-        // Usamos masa_mes (g/mes) -> mg/día = (g/mes*1000)/30
         $totalPrincipiosMgDia = 0.0;
-
         foreach ($items as $it) {
             if ((int)$it->cod_odoo === self::COD_CELULOSA) continue;
-
-            // si tiene masa_mes, es “pesado” (incluye probióticos aunque unidad sea UFC)
             if (!is_null($it->masa_mes)) {
                 $mgDia = (((float)$it->masa_mes) * 1000.0) / 30.0;
                 $totalPrincipiosMgDia += $mgDia;
@@ -156,16 +186,13 @@ class FormulasEstController extends Controller
         $celPorCapsMg   = $celMgDia / $tomasDia;
         $contenidoCaps  = $dosisPorCapsMg + $celPorCapsMg;
 
-        // Presentación: detectar cápsulas (und/mes)
         $capsMes = 0.0;
         $capsItem = $items->first(function($it){
             $cod = (int)$it->cod_odoo;
             $name = mb_strtolower((string)$it->activo);
             return in_array($cod, self::CAPSULA_CODES_FALLBACK, true) || str_contains($name, 'capsul');
         });
-        if ($capsItem) {
-            $capsMes = (float)($capsItem->cantidad ?? 0);
-        }
+        if ($capsItem) $capsMes = (float)($capsItem->cantidad ?? 0);
 
         $resumen = [
             'total_principios_mg_dia' => $totalPrincipiosMgDia,
@@ -185,7 +212,6 @@ class FormulasEstController extends Controller
 
     /**
      * Actualiza celulosa (3291) en mg/día y recalcula masa_mes (g/mes)
-     * masa_mes = (mg_dia * 30) / 1000
      */
     public function updateCelulosa(Request $request, int $id)
     {
@@ -206,12 +232,11 @@ class FormulasEstController extends Controller
         $mgDia  = (float)$data['mg_dia'];
         $masaG  = ($mgDia * 30.0) / 1000.0;
 
-        $item->cantidad = $mgDia;  // mg/día
+        $item->cantidad = $mgDia;
         $item->unidad   = 'mg';
-        $item->masa_mes = $masaG;  // g/mes
+        $item->masa_mes = $masaG;
         $item->save();
 
-        // devolvemos también datos para refrescar el resumen
         $tomasDia = (float)($formula->tomas_diarias ?? 0);
         if ($tomasDia <= 0) $tomasDia = 1.0;
 
@@ -228,7 +253,7 @@ class FormulasEstController extends Controller
     public function itemsExportXlsx(int $id)
     {
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta']);
-        $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
+        $endCodes = self::endCodes();
 
         $rows = FormulaItem::where('codigo', $f->codigo)
             ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
@@ -248,11 +273,10 @@ class FormulasEstController extends Controller
         foreach ($rows as $it) {
             $u = strtolower((string)$it->unidad);
 
-            // ✅ IMPORTANTE: probióticos (UFC) se exportan como masa (g) usando masa_mes
             $esMasa = in_array($u, ['mg','mcg','ui','g','ufc'], true);
 
             $cantidadExport = $esMasa
-                ? (float)($it->masa_mes ?? 0) // g/mes
+                ? (float)($it->masa_mes ?? 0)
                 : (float)($it->cantidad ?? 0);
 
             $unidadExport = $esMasa
@@ -302,35 +326,34 @@ class FormulasEstController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * Si usas items_print aparte (otra plantilla), lo dejo intacto.
+     */
     public function itemsPrint(int $id)
     {
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta','tomas_diarias']);
 
-        $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
+        $endCodes = self::endCodes();
 
         $itemsAll = FormulaItem::where('codigo', $f->codigo)
             ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
             ->orderByDesc('id')
             ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
 
-        // ✅ excluir para impresión
-        $items = $itemsAll->reject(fn($it) => in_array((int)$it->cod_odoo, self::PRINT_EXCLUDE_CODES, true))
-                        ->values();
+        $items = self::filterForPrint($itemsAll);
 
-        // (si tu resumen lo quieres basado SOLO en los imprimibles, usa $items; si no, usa $itemsAll)
         $tomasDia = (float)($f->tomas_diarias ?? 1);
         if ($tomasDia <= 0) $tomasDia = 1.0;
 
-        $cel = $itemsAll->firstWhere('cod_odoo', self::COD_CELULOSA); // celulosa sí cuenta para el resumen
+        $cel = $itemsAll->firstWhere('cod_odoo', self::COD_CELULOSA);
         $celMgDia = $cel ? (float)($cel->cantidad ?? 0) : 0.0;
 
         $totalPrincipiosMgDia = 0.0;
         foreach ($itemsAll as $it) {
             $cod = (int)$it->cod_odoo;
             if ($cod === self::COD_CELULOSA) continue;
-            // OJO: si hay items UND/UFC, solo sumamos los que tengan masa_mes (g/mes)
             if (!is_null($it->masa_mes)) {
-                $totalPrincipiosMgDia += (((float)$it->masa_mes) * 1000.0) / 30.0; // mg/día
+                $totalPrincipiosMgDia += (((float)$it->masa_mes) * 1000.0) / 30.0;
             }
         }
 
@@ -348,7 +371,7 @@ class FormulasEstController extends Controller
 
         return view('fe.items_print', [
             'f'       => $f,
-            'items'   => $items,   // ✅ ya filtrados
+            'items'   => $items,
             'resumen' => $resumen,
         ]);
     }
