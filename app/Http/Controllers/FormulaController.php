@@ -16,7 +16,10 @@ class FormulaController extends Controller
     private const CAPS_MG_POR_UND = 475;
 
     private const COD_CAPSULA_465 = 3392;
-    private const COD_PASTILLERO  = 3396;
+
+    // Pastilleros
+    private const COD_PASTILLERO_SMALL = 3394; // 30 caps
+    private const COD_PASTILLERO_LARGE = 3396; // 120 caps
 
     private const COD_TAPA_SEG    = 3398;
     private const COD_LINNER      = 3395;
@@ -28,8 +31,12 @@ class FormulaController extends Controller
 
     private const COD_CELULOSA    = 3291;
 
-    private const PAST_CAP_SMALL = 60;
-    private const PAST_CAP_LARGE = 150;
+    // Capacidades
+    private const PAST_CAP_SMALL = 30;
+    private const PAST_CAP_LARGE = 120;
+
+    // Tomás/cápsulas diarias permitidas (snap hacia arriba)
+    private const TOMAS_PERMITIDAS = [1, 2, 3, 6, 9, 12, 15, 18];
 
     /**
      * Conversiones especiales UI -> mg (por cod_odoo)
@@ -286,7 +293,8 @@ class FormulaController extends Controller
             return ['tomas' => 0, 'caps_dia' => 0, 'caps_mes' => 0];
         }
 
-        $capsDia = (int) ceil($totalMgDia / self::CAPS_MG_POR_UND);
+        $rawCapsDia = (int) ceil($totalMgDia / self::CAPS_MG_POR_UND);
+        $capsDia = $this->snapTomasPermitidas($rawCapsDia);
 
         return [
             'tomas'    => $capsDia,
@@ -295,14 +303,83 @@ class FormulaController extends Controller
         ];
     }
 
-    private function pastillerosNecesarios(int $capsMes): int
+    private function snapTomasPermitidas(int $raw): int
     {
-        $needed = max(0, $capsMes);
+        if ($raw <= 1) return 1;
 
-        if ($needed <= self::PAST_CAP_SMALL) return 1;
-        if ($needed <= self::PAST_CAP_LARGE) return 1;
+        foreach (self::TOMAS_PERMITIDAS as $t) {
+            if ($raw <= $t) return $t;
+        }
 
-        return (int) ceil($needed / self::PAST_CAP_LARGE);
+        // cap duro a 18 (si mañana cambias regla, se ajusta aquí)
+        return self::TOMAS_PERMITIDAS[count(self::TOMAS_PERMITIDAS) - 1];
+    }
+
+    /**
+     * Selección de pastillero + cantidad de pastilleros
+     * - Si capsMes <= 30 => usa SMALL (3394) y 1 und
+     * - Si capsMes > 30  => usa LARGE (3396)
+     *   - Si capsMes <= 120 => 1 und
+     *   - Si capsMes > 120 => calcula N pastilleros tal que:
+     *        a) capsMes / N sea ENTERO (mismo # de cápsulas por pastillero)
+     *        b) capsMes / N <= 120
+     *      eligiendo el N mínimo que cumpla.
+     */
+    private function selectPastillero(int $capsMes): array
+    {
+        $capsMes = max(0, (int)$capsMes);
+
+        if ($capsMes <= self::PAST_CAP_SMALL) {
+            return [
+                'cod'          => self::COD_PASTILLERO_SMALL,
+                'capacidad'    => self::PAST_CAP_SMALL,
+                'count'        => ($capsMes > 0 ? 1 : 0),
+                'caps_por_env' => $capsMes,
+            ];
+        }
+
+        // Siempre LARGE si pasa de 30
+        $cap = self::PAST_CAP_LARGE;
+
+        if ($capsMes <= $cap) {
+            return [
+                'cod'          => self::COD_PASTILLERO_LARGE,
+                'capacidad'    => $cap,
+                'count'        => 1,
+                'caps_por_env' => $capsMes,
+            ];
+        }
+
+        // mínimo número de pastilleros por capacidad
+        $min = (int) ceil($capsMes / $cap);
+
+        // Buscar el N mínimo que divide capsMes, garantizando igualdad
+        $n = $min;
+        while ($n <= $capsMes && ($capsMes % $n) !== 0) {
+            $n++;
+        }
+
+        // Fallback ultra defensivo (no debería ocurrir porque n=capsMes siempre divide)
+        if ($n > $capsMes) $n = $min;
+
+        $capsPor = (int) ($capsMes / $n);
+        if ($capsPor > $cap) {
+            // Si por alguna razón no cumple capacidad, subir N hasta cumplir
+            while ($n < $capsMes) {
+                $n++;
+                if (($capsMes % $n) === 0) {
+                    $capsPor = (int) ($capsMes / $n);
+                    if ($capsPor <= $cap) break;
+                }
+            }
+        }
+
+        return [
+            'cod'          => self::COD_PASTILLERO_LARGE,
+            'capacidad'    => $cap,
+            'count'        => $n,
+            'caps_por_env' => (int) ($capsMes / $n),
+        ];
     }
 
     private function buildCatalog(array $cods)
@@ -327,7 +404,11 @@ class FormulaController extends Controller
         $cods = array_merge($cods, [
             self::COD_CELULOSA,
             self::COD_CAPSULA_465,
-            self::COD_PASTILLERO,
+
+            // ambos pastilleros al catálogo
+            self::COD_PASTILLERO_SMALL,
+            self::COD_PASTILLERO_LARGE,
+
             self::COD_TAPA_SEG,
             self::COD_LINNER,
             self::COD_ETIQUETA,
@@ -376,6 +457,7 @@ class FormulaController extends Controller
         $limiteMgDia  = $capsDia * self::CAPS_MG_POR_UND;
         $rellenoMgDia = max(0.0, $limiteMgDia - $totalMgDia);
 
+        // Celulosa (relleno por capacidad)
         if ($rellenoMgDia > 0) {
             $rowCel = [
                 'cod_odoo' => self::COD_CELULOSA,
@@ -396,8 +478,12 @@ class FormulaController extends Controller
             $rows->push($rowCel);
         }
 
-        $pastCount = $this->pastillerosNecesarios($capsMes);
+        // Selección de pastillero según capsMes
+        $past = $this->selectPastillero($capsMes);
+        $pastCount = (int) ($past['count'] ?? 0);
+        $pastCod   = (int) ($past['cod'] ?? self::COD_PASTILLERO_LARGE);
 
+        // Cápsulas (und/mes)
         $rowCaps = [
             'cod_odoo' => self::COD_CAPSULA_465,
             'activo'   => $catalogo[self::COD_CAPSULA_465]->nombre ?? 'CÁPSULA 465 mg',
@@ -409,17 +495,20 @@ class FormulaController extends Controller
         if ($mode === 'save') $rowCaps['masa_mes'] = null;
         $rows->push($rowCaps);
 
+        // Pastillero (small o large) - und/mes
         $rowPast = [
-            'cod_odoo' => self::COD_PASTILLERO,
-            'activo'   => $catalogo[self::COD_PASTILLERO]->nombre ?? 'PASTILLERO',
+            'cod_odoo' => $pastCod,
+            'activo'   => $catalogo[$pastCod]->nombre
+                ?? ($pastCod === self::COD_PASTILLERO_SMALL ? 'PASTILLERO 30' : 'PASTILLERO 120'),
             'cantidad' => (float)$pastCount,
             'unidad'   => 'und',
             'mg_dia'   => null,
         ];
-        if ($withCost) $rowPast['valor_costo'] = (float)($catalogo[self::COD_PASTILLERO]->valor_costo ?? 0);
+        if ($withCost) $rowPast['valor_costo'] = (float)($catalogo[$pastCod]->valor_costo ?? 0);
         if ($mode === 'save') $rowPast['masa_mes'] = null;
         $rows->push($rowPast);
 
+        // Insumos por pastillero (se multiplican por # de pastilleros)
         $insumosPorPastillero = [
             [self::COD_TAPA_SEG, 'TAPA DE SEGURIDAD'],
             [self::COD_LINNER,   'LINNER ESPUMADO'],
@@ -439,6 +528,7 @@ class FormulaController extends Controller
             $rows->push($rowIns);
         }
 
+        // Insumos fijos (1 und)
         $insumosFijos = [
             [self::COD_EXTRA_1, 'CIF'],
             [self::COD_EXTRA_2, 'MOI'],
@@ -465,6 +555,11 @@ class FormulaController extends Controller
             'capsDia'       => $capsDia,
             'capsMes'       => $capsMes,
             'tomasDiarias'  => $tomasDiarias,
+
+            // opcional por si lo quieres mostrar en la vista
+            'pastCod'       => $pastCod,
+            'pastCount'     => $pastCount,
+            'capsPorPast'   => (int)($past['caps_por_env'] ?? 0),
         ];
     }
 
@@ -514,6 +609,11 @@ class FormulaController extends Controller
             'capsMes'       => $dataView['capsMes'],
             'tomasDiarias'  => $dataView['tomasDiarias'],
             'codFormula'    => $this->buildCodFormula(),
+
+            // opcional por si quieres mostrar detalle de distribución
+            'pastCod'       => $dataView['pastCod'] ?? null,
+            'pastCount'     => $dataView['pastCount'] ?? null,
+            'capsPorPast'   => $dataView['capsPorPast'] ?? null,
 
             'totalGeneral'  => $pricing['totalGeneral'],
             'precio_pvp_v'  => $pricing['pvp'],
@@ -621,7 +721,8 @@ class FormulaController extends Controller
         $codsExcluir  = [
             self::COD_CELULOSA,
             self::COD_CAPSULA_465,
-            self::COD_PASTILLERO,
+            self::COD_PASTILLERO_SMALL,
+            self::COD_PASTILLERO_LARGE,
             self::COD_TAPA_SEG,
             self::COD_LINNER,
             self::COD_ETIQUETA,
@@ -630,7 +731,8 @@ class FormulaController extends Controller
             self::COD_EXTRA_3,
         ];
 
-        $regexExcluir = '/(celulosa|capsula|cápsula|capsulas|cápsulas|pastillero|pastilleros|tapa|linner|etiqueta|3434|3435|3436)/i';
+        // regex ya cubre "pastillero", pero igual quedan los codes extra por si vienen en nombre
+        $regexExcluir = '/(celulosa|capsula|cápsula|capsulas|cápsulas|pastillero|pastilleros|tapa|linner|etiqueta|3434|3435|3436|3394|3396)/i';
 
         DB::transaction(function () use ($userId, $formula, $codsExcluir, $regexExcluir) {
             ActivoTemp::where('user_id', $userId)->delete();

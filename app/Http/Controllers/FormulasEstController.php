@@ -19,6 +19,10 @@ class FormulasEstController extends Controller
 
     private const COD_CELULOSA = 3291;
 
+    private const PRINT_EXCLUDE_CODES = [
+        3392, 3396, 3398, 3395, 3393, 3434, 3435, 3436,
+    ];
+
     // Para detectar “cápsula” en caso de que tus códigos varíen
     private const CAPSULA_CODES_FALLBACK = [3392, 3994, 70274];
 
@@ -304,23 +308,29 @@ class FormulasEstController extends Controller
 
         $endCodes = array_merge(self::NEW_END_CODES, self::OLD_END_CODES);
 
-        $items = FormulaItem::where('codigo', $f->codigo)
-            ->orderByRaw('CASE WHEN cod_odoo = 3291 THEN 1 ELSE 0 END ASC')
-            ->orderBy('id', 'ASC') // o tu orden actual (created_at, etc.)
-            ->get();
+        $itemsAll = FormulaItem::where('codigo', $f->codigo)
+            ->orderByRaw('CASE WHEN cod_odoo IN ('.implode(',', $endCodes).') THEN 1 ELSE 0 END')
+            ->orderByDesc('id')
+            ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
 
-        $tomasDia = (float)($f->tomas_diarias ?? 0);
+        // ✅ excluir para impresión
+        $items = $itemsAll->reject(fn($it) => in_array((int)$it->cod_odoo, self::PRINT_EXCLUDE_CODES, true))
+                        ->values();
+
+        // (si tu resumen lo quieres basado SOLO en los imprimibles, usa $items; si no, usa $itemsAll)
+        $tomasDia = (float)($f->tomas_diarias ?? 1);
         if ($tomasDia <= 0) $tomasDia = 1.0;
 
-        $cel = $items->firstWhere('cod_odoo', self::COD_CELULOSA);
+        $cel = $itemsAll->firstWhere('cod_odoo', self::COD_CELULOSA); // celulosa sí cuenta para el resumen
         $celMgDia = $cel ? (float)($cel->cantidad ?? 0) : 0.0;
 
         $totalPrincipiosMgDia = 0.0;
-        foreach ($items as $it) {
-            if ((int)$it->cod_odoo === self::COD_CELULOSA) continue;
+        foreach ($itemsAll as $it) {
+            $cod = (int)$it->cod_odoo;
+            if ($cod === self::COD_CELULOSA) continue;
+            // OJO: si hay items UND/UFC, solo sumamos los que tengan masa_mes (g/mes)
             if (!is_null($it->masa_mes)) {
-                $mgDia = (((float)$it->masa_mes) * 1000.0) / 30.0;
-                $totalPrincipiosMgDia += $mgDia;
+                $totalPrincipiosMgDia += (((float)$it->masa_mes) * 1000.0) / 30.0; // mg/día
             }
         }
 
@@ -328,28 +338,18 @@ class FormulasEstController extends Controller
         $celPorCapsMg   = $celMgDia / $tomasDia;
         $contenidoCaps  = $dosisPorCapsMg + $celPorCapsMg;
 
-        $capsMes = 0.0;
-        $capsItem = $items->first(function($it){
-            $cod  = (int)$it->cod_odoo;
-            $name = mb_strtolower((string)$it->activo);
-            return in_array($cod, self::CAPSULA_CODES_FALLBACK, true) || str_contains($name, 'capsul');
-        });
-        if ($capsItem) $capsMes = (float)($capsItem->cantidad ?? 0);
-
         $resumen = [
             'total_principios_mg_dia' => $totalPrincipiosMgDia,
             'dosis_caps_mg'           => $dosisPorCapsMg,
             'celulosa_caps_mg'        => $celPorCapsMg,
             'contenido_caps_mg'       => $contenidoCaps,
-            'presentacion_caps'       => $capsMes,
             'dosificacion_caps_dia'   => $tomasDia,
         ];
 
         return view('fe.items_print', [
             'f'       => $f,
-            'items'   => $items,
+            'items'   => $items,   // ✅ ya filtrados
             'resumen' => $resumen,
         ]);
     }
-
 }
