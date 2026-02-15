@@ -27,17 +27,50 @@
 
 <body>
   <div class="toolbar no-print">
-    <button class="btn" onclick="history.back()">Regresar</button>
     <button class="btn btn-primary" onclick="window.print()">Imprimir</button>
   </div>
+
+  <div class="block op-header">
+    <h1>Orden de Producción</h1>
+    <p class="sub">Fecha: <span id="op-fecha"><?= htmlspecialchars($fechaProduccion) ?></span></p>
+    <!-- <p class="sub">OP #: <strong><?= htmlspecialchars($numeroOP) ?></strong></p> -->
+  </div>
+
 
   <div class="block">
     <h2>Ítems de la fórmula</h2>
     <p class="sub">{{ $f->codigo }} — {{ $f->nombre_etiqueta }}</p>
   </div>
 
+  {{-- Tabla ítems (ya viene filtrada desde el controller) --}}
+  <div class="block">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:90px;">Cod. Odoo</th>
+          <th>Activo</th>
+          <th class="right" style="width:110px;">Cantidad</th>
+          <th style="width:70px;">Unidad</th>
+          <th class="right" style="width:110px;">Masa G</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach($items as $it)
+          @php $masaG = $it->masa_mes !== null ? (float)$it->masa_mes : 0.0; @endphp
+          <tr>
+            <td>{{ $it->cod_odoo }}</td>
+            <td>{{ $it->activo }}</td>
+            <td class="right">{{ number_format((float)$it->cantidad, 2, '.', '') }}</td>
+            <td>{{ $it->unidad }}</td>
+            <td class="right">{{ number_format($masaG, 4, '.', '') }}</td>
+          </tr>
+        @endforeach
+      </tbody>
+    </table>
+  </div>
+
   {{-- Resumen --}}
-  <div class="block" style="margin-bottom: 10px;">
+  <div class="block" style="margin-top: 10px;">
     <table>
       <tbody>
         <tr>
@@ -65,33 +98,6 @@
           <td class="right">{{ number_format((float)($resumen['dosificacion_caps_dia'] ?? 0), 0, '.', '') }}</td>
           <td>cápsulas diarias</td>
         </tr>
-      </tbody>
-    </table>
-  </div>
-
-  {{-- Tabla ítems (ya viene filtrada desde el controller) --}}
-  <div class="block">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:90px;">Cod. Odoo</th>
-          <th>Activo</th>
-          <th class="right" style="width:110px;">Cantidad</th>
-          <th style="width:70px;">Unidad</th>
-          <th class="right" style="width:110px;">Masa G</th>
-        </tr>
-      </thead>
-      <tbody>
-        @foreach($items as $it)
-          @php $masaG = $it->masa_mes !== null ? (float)$it->masa_mes : 0.0; @endphp
-          <tr>
-            <td>{{ $it->cod_odoo }}</td>
-            <td>{{ $it->activo }}</td>
-            <td class="right">{{ number_format((float)$it->cantidad, 2, '.', '') }}</td>
-            <td>{{ $it->unidad }}</td>
-            <td class="right">{{ number_format($masaG, 4, '.', '') }}</td>
-          </tr>
-        @endforeach
       </tbody>
     </table>
   </div>

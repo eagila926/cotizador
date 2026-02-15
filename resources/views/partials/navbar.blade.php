@@ -46,13 +46,17 @@
       </a>
 
       <ul class="collapse nav flex-column ms-3" id="submenuUsuarios">
-        <li>
-          <a href="{{ route('usuarios.create') }}"
-             class="nav-link text-white-50 {{ request()->routeIs('usuarios.create') ? 'active' : '' }}">
-            <i class="bi bi-person-plus me-2"></i>Crear usuario
-          </a>
-        </li>
-      </ul>
+              <li>
+                <a class="dropdown-item" href="{{ route('usuarios.index') }}">
+                  Listar usuarios
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="{{ route('usuarios.create') }}">
+                  Registrar usuario
+                </a>
+              </li>
+            </ul>
     </li>
     @endif
 
