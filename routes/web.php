@@ -7,6 +7,9 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\FormulaController;
 use App\Http\Controllers\FormulasEstController;
+use App\Http\Controllers\OrdenProduccionController;
+use App\Models\OrdenProduccion;
+use App\Models\OrdenImpresion;
 
 Route::middleware('guest')->group(function () {
     Route::get('/login',  [AuthController::class, 'showLoginForm'])->name('login');
@@ -66,6 +69,14 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/{id}/items/print', [FormulasEstController::class, 'itemsPrint'])->name('items.print');
     });
+
+    Route::prefix('ordenes-produccion')->name('op.')->group(function () {
+        Route::post('/', [OrdenProduccionController::class, 'store'])->name('store');
+        Route::post('/{id}/print-log', [OrdenProduccionController::class, 'printLog'])->name('printLog');
+         // guardar transferencia / lote_interno / lote
+        Route::post('/{id}/meta', [OrdenProduccionController::class, 'saveMeta'])->name('meta');
+        });
+        
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });

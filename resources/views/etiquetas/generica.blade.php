@@ -2,7 +2,6 @@
     $prefill = session('etiqueta_preview', []);
     $soPrefill = $prefill['so'] ?? null;
     $medicoPrefill = $prefill['medico'] ?? null;
-    $pacientePrefill = $prefill['paciente'] ?? null;
 
     function nombreCorto($full) {
         $full = trim((string)$full);
@@ -24,7 +23,6 @@
         return $nombre;
     }
 
-    // ✅ cantidad: sin .00 y recorta ceros
     function fmtCantidad($v, $maxDec = 2) {
         if (!is_numeric($v)) return (string)$v;
         $n = (float)$v;
@@ -33,22 +31,50 @@
         return $s === '' ? '0' : $s;
     }
 
-    // Columnas equilibradas
+    // === Distribución asimétrica: balancea por "peso" del texto (nombres largos pesan más) ===
+    function distribuirActivosAsimetrico($items, int $cols = 2) {
+        $cols = max(1, $cols);
+        $buckets = array_fill(0, $cols, ['w' => 0, 'items' => []]);
+
+        foreach ($items as $it) {
+            $nombre = abreviarNombreActivoView($it->activo ?? '');
+            // peso aproximado: largo + penalización por espacios (suelen indicar nombres compuestos)
+            $len = mb_strlen($nombre);
+            $spaces = substr_count($nombre, ' ');
+            $weight = $len + ($spaces * 4);
+
+            // meter en la columna más ligera
+            $minIdx = 0;
+            for ($i=1; $i<$cols; $i++) {
+                if ($buckets[$i]['w'] < $buckets[$minIdx]['w']) $minIdx = $i;
+            }
+            $buckets[$minIdx]['items'][] = $it;
+            $buckets[$minIdx]['w'] += $weight;
+        }
+
+        // devolver solo items
+        return array_map(fn($b) => collect($b['items']), $buckets);
+    }
+
     $items = $items ?? collect();
     $totalActivos = $items->count();
 
-    $espaciadoExtra = '';
-    if ($totalActivos >= 1 && $totalActivos <= 4) {
-        $espaciadoExtra = 'margin-top: 60px; margin-bottom: 40px;';
-    } elseif ($totalActivos >= 5 && $totalActivos <= 10) {
-        $espaciadoExtra = 'margin-top: 30px; margin-bottom: 20px;';
-    }
-
+    // columnas: 2 por defecto, 3 si vienen muchos
     $columnas = 2;
-    if ($totalActivos >= 16 && $totalActivos <= 30) $columnas = 3;
+    if ($totalActivos >= 18) $columnas = 3;
 
-    $porCol = max(1, (int) ceil($totalActivos / $columnas));
-    $chunks = $items->chunk($porCol);
+    // tipografía dinámica para compactar
+    // (ajusta estos cortes si quieres más/menos compacto)
+    $fsActivo = 20; // px
+    $fsCant  = 20;
+    $lh      = 1.05;
+
+    if ($totalActivos >= 10 && $totalActivos <= 14) { $fsActivo = 18; $fsCant = 18; }
+    if ($totalActivos >= 15 && $totalActivos <= 20) { $fsActivo = 16; $fsCant = 16; }
+    if ($totalActivos >= 21) { $fsActivo = 14; $fsCant = 14; }
+
+    // columnas asimétricas
+    $cols = distribuirActivosAsimetrico($items, $columnas);
 
     // Pie
     $tomas = (int) ($formula->tomas_diarias ?? 3);
@@ -59,7 +85,7 @@
     $nombreEtiqueta = (string) ($formula->nombre_etiqueta ?? '');
     $fontSizeTitulo = (mb_strlen($nombreEtiqueta) > 31) ? '25px' : '28px';
 
-    $qf = $qf ?? 'Q.F. Jose Perez';
+    $qf = $qf ?? 'Q.F. Leonardo ';
     $fechaElaboracion = $fechaElaboracion ?? now()->format('d-m-Y');
 @endphp
 
@@ -69,105 +95,153 @@
 <meta charset="utf-8">
 <title>Etiqueta – {{ $formula->codigo }}</title>
 <style>
-  body { font-family: Helvetica, Arial, sans-serif; margin: 22px; }
-  .container { width: 90%; margin: 0 auto; }
+  body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+  .wrap { padding: 10px 12px; } /* margen interno general, SIN fijar tamaño total */
 
-  .row { display: flex; justify-content: space-between; margin-bottom: 2px; gap: 12px; }
-  .col { flex: 1; padding: 1px; font-size: 21px; }
+  /* “Área blanca” lógica: simula tu layout sin forzar 50x142 */
+  .label-grid {
+    display: grid;
+    grid-template-columns: 22% 1fr 42px;  /* izq reservado / centro / banda vertical */
+    gap: 10px;
+    align-items: start;
+  }
 
-  .header { text-align: left; margin-top: 10px; margin-left: 390px; font-weight: bold; margin-bottom: 45px; }
-  .footer { margin-top: 10px; font-size: 25px; }
+  /* Bloque izquierdo: NO mostramos nada (solo reserva espacio). Si quieres ocultarlo del todo, pon display:none */
+  .left-spacer { min-height: 1px; }
 
+  .center { min-width: 0; }
+
+  .title {
+    font-size: {{ $fontSizeTitulo }};
+    font-weight: 800;
+    margin: 6px 0 10px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Composición */
+  .comp {
+    display: grid;
+    grid-template-columns: repeat({{ $columnas }}, 1fr);
+    gap: 14px;
+  }
+
+  .comp-col { min-width: 0; }
+
+  .comp-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    margin: 2px 0;
+  }
+
+  .comp-nombre {
+    font-weight: 800;
+    font-size: {{ $fsActivo }}px;
+    line-height: {{ $lh }};
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .comp-cant {
+    font-weight: 800;
+    font-size: {{ $fsCant }}px;
+    white-space: nowrap;
+    text-align: right;
+    display: inline-flex;
+    gap: 8px;
+  }
+
+  /* Banda vertical derecha */
+  .vertical {
+    font-weight: 800;
+    font-size: 16px;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 10px;
+  }
+
+  /* Pie */
+  .footer {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .so { font-size: 20px; margin-top: 6px; }
+
+  /* Editables */
   .editable { border-bottom: 1px dashed #bbb; padding: 2px 4px; display: inline-block; }
   .editable:focus { outline: 2px solid #ddeaff; border-bottom-color: transparent; }
 
-  .nombre-etiqueta { font-size: {{ $fontSizeTitulo }}; font-weight: 700; background: transparent; width: 100%; text-align: left; }
-  .pte { font-weight: bold; font-size: 20px; background: transparent; width: 100%; text-align: left; }
-  .so  { font-weight: bold; font-size: 24px; background: transparent; width: 100%; text-align: left; }
-
-  .comp-row { display:flex; justify-content:space-between; margin: 2px 0; gap: 10px; }
-  .comp-nombre { font-weight: bold; font-size: 20px; max-width: 70%; }
-  .comp-cant { text-align: right; font-weight: bold; font-size: 20px; display:flex; justify-content:flex-end; gap: 8px; white-space: nowrap; }
-
-  @media print {
-    .editable { border: none !important; }
-  }
+  @media print { .editable { border: none !important; padding: 0 !important; } }
 </style>
 </head>
 <body>
 
-<div class="container">
-  {{-- Título --}}
-  <div class="header">
-    <div class="editable nombre-etiqueta" contenteditable="true">{{ $nombreEtiqueta }}</div>
-  </div>
+<div class="wrap">
+  <div class="label-grid">
 
-  {{-- Paciente y Código --}}
-  <div class="row">
-    <div class="editable pte" contenteditable="true">
-      PTE: {{ $pacientePrefill ?? ($formula->paciente ?? '-') }}
-    </div>
-    <div class="editable pte" contenteditable="true" style="text-align:center;">
-      {{ $formula->codigo }}
-    </div>
-  </div>
+    {{-- Reserva espacio izquierdo (precauciones del diseño físico) --}}
+    <div class="left-spacer"></div>
 
-  {{-- Composición (EDITABLE TODO) --}}
-  <div class="row" style="{{ $espaciadoExtra }}">
-    @foreach($chunks as $col)
-      <div class="col" style="width: {{ floor(100 / $columnas) }}%; padding-right: 15px;">
-        @foreach($col as $it)
-          <div class="comp-row">
-            <div class="comp-nombre editable" contenteditable="true">
-              {{ abreviarNombreActivoView($it->activo) }}
-            </div>
+    {{-- Centro --}}
+    <div class="center">
+      <div class="title editable" contenteditable="true">{{ $nombreEtiqueta }}</div>
 
-            <div class="comp-cant">
-              <span class="editable js-num-dec" contenteditable="true">{{ fmtCantidad($it->cantidad, 2) }}</span>
-              <span class="editable" contenteditable="true">{{ $it->unidad ?? 'mg' }}</span>
-            </div>
+      <div class="comp">
+        @foreach($cols as $col)
+          <div class="comp-col">
+            @foreach($col as $it)
+              <div class="comp-row">
+                <div class="comp-nombre editable" contenteditable="true">
+                  {{ abreviarNombreActivoView($it->activo) }}
+                </div>
+                <div class="comp-cant">
+                  <span class="editable js-num-dec" contenteditable="true">{{ fmtCantidad($it->cantidad, 2) }}</span>
+                  <span class="editable" contenteditable="true">{{ $it->unidad ?? 'mg' }}</span>
+                </div>
+              </div>
+            @endforeach
           </div>
         @endforeach
       </div>
-    @endforeach
-  </div>
 
-  {{-- Pie --}}
-  <div class="footer" style="{{ $espaciadoExtra }}">
-    <div class="row" style="align-items:flex-start;">
-      <div class="col">
+      <div class="footer">
         <div>
-          <strong>DR.(A):
-            <span class="editable" contenteditable="true">
-              {{ $medicoCorto ?? ($formula->medico ?? '-') }}
-            </span>
-          </strong>
+          DR.(A): <span class="editable" contenteditable="true">{{ $medicoCorto ?? ($formula->medico ?? '-') }}</span><br>
+          POSOLOGÍA: TOMAR <span class="editable js-only-numbers" contenteditable="true">{{ $tomas }}</span> CÁPSULAS DIARIAS
         </div>
 
         <div>
-          <strong>CONTIENE: </strong>
-          <strong><span class="editable js-only-numbers" contenteditable="true">{{ $contieneCaps }}</span> CÁPSULAS</strong>
-        </div>
-
-        <div>
-          <strong>POSOLOGÍA: TOMAR </strong>
-          <strong><span class="editable js-only-numbers" contenteditable="true">{{ $tomas }}</span> CÁPSULAS DIARIAS</strong>
-        </div>
-      </div>
-
-      <div class="col" style="text-align:left;">
-        <div><strong class="editable" contenteditable="true">{{ $qf }}</strong></div>
-        <div><strong>ELAB: <span class="editable" contenteditable="true">{{ $fechaElaboracion }}</span></strong></div>
-        <div class="editable so" contenteditable="true">
-          SO.@if($soPrefill) {{ ' ' . $soPrefill }} @endif
+          <span class="editable" contenteditable="true">{{ $qf }}</span><br>
+          ELAB: <span class="editable" contenteditable="true">{{ $fechaElaboracion }}</span><br>
         </div>
       </div>
     </div>
+
+    {{-- Banda vertical derecha --}}
+    <div class="vertical editable" contenteditable="true">
+      CONTENIDO: {{ $contieneCaps }} CAPSULAS
+    </div>
+
   </div>
 </div>
 
 <script>
-  // Evitar saltos de línea en contenteditable
+  // Evitar saltos de línea
   document.querySelectorAll('.editable').forEach(el => {
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
@@ -187,7 +261,7 @@
     });
   });
 
-  // Números con decimal opcional (1 punto)
+  // Decimal opcional
   document.querySelectorAll('.js-num-dec').forEach(el => {
     const clean = (txt) => {
       txt = (txt || '').replace(/,/g, '.');
@@ -197,10 +271,7 @@
       return txt;
     };
 
-    el.addEventListener('input', () => {
-      el.textContent = clean(el.textContent);
-    });
-
+    el.addEventListener('input', () => { el.textContent = clean(el.textContent); });
     el.addEventListener('paste', (e) => {
       e.preventDefault();
       const text = (e.clipboardData || window.clipboardData).getData('text');

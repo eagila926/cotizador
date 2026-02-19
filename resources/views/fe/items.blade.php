@@ -18,9 +18,10 @@
 
       <div class="d-flex gap-2">
         <a href="{{ route('fe.index') }}" class="btn btn-secondary btn-sm">Regresar</a>
-        <a href="{{ route('fe.items.print', $f->id) }}" target="_blank" class="btn btn-dark btn-sm">
+        <button type="button" id="btn-imprimir" class="btn btn-dark btn-sm">
           Imprimir
-        </a>
+        </button>
+
         <a href="{{ route('fe.items.export', $f->id) }}" class="btn btn-success btn-sm">Exportar</a>
       </div>
     </div>
@@ -214,5 +215,48 @@
   });
 })();
 </script>
+
+<script>
+(function(){
+  const csrf = '{{ csrf_token() }}';
+  const urlCrearOP   = @json(route('op.store'));
+  const urlPrintBase = @json(route('fe.items.print', $f->id));
+
+  const btn = document.getElementById('btn-imprimir');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(urlCrearOP, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrf,
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({})
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.ok || !data.op?.id) {
+        alert(data.message || 'No se pudo crear la Orden de Producción.');
+        return;
+      }
+
+      window.open(`${urlPrintBase}?op_id=${encodeURIComponent(data.op.id)}`, '_blank', 'noopener');
+    } catch (e) {
+      console.error(e);
+      alert('Error al crear OP.');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+
+
 
 @endsection

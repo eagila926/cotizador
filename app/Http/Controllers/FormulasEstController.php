@@ -8,6 +8,7 @@ use App\Models\FormulaItem;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\OrdenProduccion;
 
 class FormulasEstController extends Controller
 {
@@ -329,7 +330,7 @@ class FormulasEstController extends Controller
     /**
      * Si usas items_print aparte (otra plantilla), lo dejo intacto.
      */
-    public function itemsPrint(int $id)
+    public function itemsPrint(Request $request, int $id)
     {
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta','tomas_diarias']);
 
@@ -369,10 +370,16 @@ class FormulasEstController extends Controller
             'dosificacion_caps_dia'   => $tomasDia,
         ];
 
+        // AQUÍ CARGAMOS LA OP
+        $opId = (int) $request->query('op_id', 0);
+        $op = $opId > 0 ? OrdenProduccion::find($opId) : null;
+
         return view('fe.items_print', [
             'f'       => $f,
             'items'   => $items,
             'resumen' => $resumen,
+            'op'      => $op,
         ]);
     }
+
 }
