@@ -293,7 +293,17 @@ class FormulaController extends Controller
             return ['tomas' => 0, 'caps_dia' => 0, 'caps_mes' => 0];
         }
 
-        $rawCapsDia = (int) ceil($totalMgDia / self::CAPS_MG_POR_UND);
+        $raw = $totalMgDia / self::CAPS_MG_POR_UND;   // ej. 4.06, 4.10, etc.
+        $base = (int) floor($raw);                   // 4
+        $frac = $raw - $base;                        // 0.06, 0.10 ...
+
+        // Umbral: si el excedente es menor a 0.10 cápsulas, NO sube
+        $THRESH = 0.10;
+
+        // OJO: si base queda en 0 por algún motivo, mínimo 1 cápsula
+        $rawCapsDia = ($base <= 0) ? 1 : (($frac < $THRESH) ? $base : (int) ceil($raw));
+
+        // Aquí aplicas tu regla de permitidas (si rawCapsDia no está, sube al siguiente permitido)
         $capsDia = $this->snapTomasPermitidas($rawCapsDia);
 
         return [
