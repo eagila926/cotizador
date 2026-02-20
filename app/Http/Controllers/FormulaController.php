@@ -36,7 +36,7 @@ class FormulaController extends Controller
     private const PAST_CAP_LARGE = 120;
 
     // Tomás/cápsulas diarias permitidas (snap hacia arriba)
-    private const TOMAS_PERMITIDAS = [1, 2, 3, 6, 9, 12, 15, 18];
+    private const TOMAS_PERMITIDAS = [1, 2, 3, 4, 6, 9, 12, 15, 18];
 
     /**
      * Conversiones especiales UI -> mg (por cod_odoo)
