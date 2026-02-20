@@ -467,26 +467,24 @@ class FormulaController extends Controller
         $limiteMgDia  = $capsDia * self::CAPS_MG_POR_UND;
         $rellenoMgDia = max(0.0, $limiteMgDia - $totalMgDia);
 
-        // Celulosa (relleno por capacidad)
-        if ($rellenoMgDia > 0) {
-            $rowCel = [
-                'cod_odoo' => self::COD_CELULOSA,
-                'activo'   => $catalogo[self::COD_CELULOSA]->nombre ?? 'CELULOSA',
-                'cantidad' => $rellenoMgDia,
-                'unidad'   => 'mg',
-                'mg_dia'   => $rellenoMgDia,
-            ];
+        // Celulosa (relleno por capacidad) — SIEMPRE presente aunque sea 0
+        $rowCel = [
+            'cod_odoo' => self::COD_CELULOSA,
+            'activo'   => $catalogo[self::COD_CELULOSA]->nombre ?? 'CELULOSA',
+            'cantidad' => max(0.0, (float)$rellenoMgDia),
+            'unidad'   => 'mg',
+            'mg_dia'   => max(0.0, (float)$rellenoMgDia),
+        ];
 
-            if ($withCost) {
-                $rowCel['valor_costo'] = (float)($catalogo[self::COD_CELULOSA]->valor_costo ?? 0);
-            }
-
-            if ($mode === 'save') {
-                $rowCel['masa_mes'] = (($rellenoMgDia * 30.0) / 1000.0);
-            }
-
-            $rows->push($rowCel);
+        if ($withCost) {
+            $rowCel['valor_costo'] = (float)($catalogo[self::COD_CELULOSA]->valor_costo ?? 0);
         }
+
+        if ($mode === 'save') {
+            $rowCel['masa_mes'] = ((max(0.0, (float)$rellenoMgDia) * 30.0) / 1000.0);
+        }
+
+        $rows->push($rowCel);
 
         // Selección de pastillero según capsMes
         $past = $this->selectPastillero($capsMes);
