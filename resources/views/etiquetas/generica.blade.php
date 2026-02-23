@@ -85,7 +85,6 @@
     $nombreEtiqueta = (string) ($formula->nombre_etiqueta ?? '');
     $fontSizeTitulo = (mb_strlen($nombreEtiqueta) > 31) ? '25px' : '28px';
 
-    $qf = $qf ?? 'Q.F. Leonardo ';
     $fechaElaboracion = $fechaElaboracion ?? now()->format('d-m-Y');
 @endphp
 
@@ -226,8 +225,8 @@
         </div>
 
         <div>
-          <span class="editable" contenteditable="true">{{ $qf }}</span><br>
           ELAB: <span class="editable" contenteditable="true">{{ $fechaElaboracion }}</span><br>
+          Despues de abierto, consumir en un periodo maximo de 60 días
         </div>
       </div>
     </div>
