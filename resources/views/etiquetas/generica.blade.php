@@ -221,6 +221,7 @@
       <div class="footer">
         <div>
           DR.(A): <span class="editable" contenteditable="true">{{ $medicoCorto ?? ($formula->medico ?? '-') }}</span><br>
+          Pte: <span class="editable" contenteditable="true"></span>
           POSOLOGÍA: TOMAR <span class="editable js-only-numbers" contenteditable="true">{{ $tomas }}</span> CÁPSULAS DIARIAS
         </div>
 
