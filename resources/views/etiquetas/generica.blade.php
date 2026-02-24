@@ -38,12 +38,10 @@
 
         foreach ($items as $it) {
             $nombre = abreviarNombreActivoView($it->activo ?? '');
-            // peso aproximado: largo + penalización por espacios (suelen indicar nombres compuestos)
             $len = mb_strlen($nombre);
             $spaces = substr_count($nombre, ' ');
             $weight = $len + ($spaces * 4);
 
-            // meter en la columna más ligera
             $minIdx = 0;
             for ($i=1; $i<$cols; $i++) {
                 if ($buckets[$i]['w'] < $buckets[$minIdx]['w']) $minIdx = $i;
@@ -52,7 +50,6 @@
             $buckets[$minIdx]['w'] += $weight;
         }
 
-        // devolver solo items
         return array_map(fn($b) => collect($b['items']), $buckets);
     }
 
@@ -64,7 +61,6 @@
     if ($totalActivos >= 18) $columnas = 3;
 
     // tipografía dinámica para compactar
-    // (ajusta estos cortes si quieres más/menos compacto)
     $fsActivo = 20; // px
     $fsCant  = 20;
     $lh      = 1.05;
@@ -105,12 +101,16 @@
     align-items: start;
   }
 
-  /* Bloque izquierdo: NO mostramos nada (solo reserva espacio). Si quieres ocultarlo del todo, pon display:none */
+  /* Bloque izquierdo: NO mostramos nada (solo reserva espacio). */
   .left-spacer { min-height: 1px; }
 
   .center { min-width: 0; }
 
-  .title {
+  /* ✅ TÍTULO centrado */
+  .title{
+    width: 100%;                 /* asegura que ocupe todo el ancho */
+    display: block;              /* comportamiento de bloque completo */
+    text-align: center;          /* centra el texto */
     font-size: {{ $fontSizeTitulo }};
     font-weight: 800;
     margin: 6px 0 10px 0;
@@ -136,8 +136,9 @@
     margin: 2px 0;
   }
 
+  /* ✅ Composición SIN negrita */
   .comp-nombre {
-    font-weight: 800;
+    font-weight: 400;              /* ✅ antes 800 */
     font-size: {{ $fsActivo }}px;
     line-height: {{ $lh }};
     min-width: 0;
@@ -146,8 +147,9 @@
     text-overflow: ellipsis;
   }
 
+  /* ✅ Composición SIN negrita */
   .comp-cant {
-    font-weight: 800;
+    font-weight: 400;              /* ✅ antes 800 */
     font-size: {{ $fsCant }}px;
     white-space: nowrap;
     text-align: right;
@@ -168,6 +170,13 @@
     padding-top: 10px;
   }
 
+  /* ✅ De abajo hacia arriba: rotamos SOLO el texto */
+  .vertical .vertical-text{
+    display: inline-block;
+    transform: rotate(180deg);
+    transform-origin: center;
+  }
+
   /* Pie */
   .footer {
     margin-top: 14px;
@@ -176,7 +185,7 @@
     gap: 14px;
     align-items: start;
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 200;
   }
 
   .so { font-size: 20px; margin-top: 6px; }
@@ -221,7 +230,7 @@
       <div class="footer">
         <div>
           DR.(A): <span class="editable" contenteditable="true">{{ $medicoCorto ?? ($formula->medico ?? '-') }}</span><br>
-          Pte: <span class="editable" contenteditable="true"></span>
+          Pte: <span class="editable" contenteditable="true"></span><br>
           POSOLOGÍA: TOMAR <span class="editable js-only-numbers" contenteditable="true">{{ $tomas }}</span> CÁPSULAS DIARIAS
         </div>
 
@@ -234,7 +243,7 @@
 
     {{-- Banda vertical derecha --}}
     <div class="vertical editable" contenteditable="true">
-      CONTENIDO: {{ $contieneCaps }} CAPSULAS
+      <span class="vertical-text">CONTENIDO: {{ $contieneCaps }} CAPSULAS</span>
     </div>
 
   </div>
