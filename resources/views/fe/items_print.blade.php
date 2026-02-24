@@ -33,13 +33,11 @@
 
     .op-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
 
-    /* ✅ imprime el bloque derecho como texto */
     .print-only { display:none; }
 
     @media print {
       @page { size: A4; margin: 8mm; }
       body { padding: 0; }
-
       .no-print { display:none !important; }
       .print-only { display:block !important; }
     }
@@ -47,6 +45,18 @@
 </head>
 
 <body>
+  @php
+    // Códigos clave
+    $CAPSULA_CODES = [3392, 3994, 70274];
+    $PASTILLEROS   = [3394, 3396];
+
+    // Base (sin lote) desde controlador
+    $presentacionBase  = (float)($resumen['presentacion_caps'] ?? 0);
+    $frascoBase        = (float)($resumen['num_frascos'] ?? 1);
+    if ($frascoBase <= 0) $frascoBase = 1;
+    $capsPorFrascoBase = (float)($resumen['caps_por_frasco'] ?? 0);
+  @endphp
+
   <div class="toolbar no-print">
     <button id="btn-print-now" class="btn btn-primary" {{ empty($op?->id) ? 'disabled' : '' }}>Imprimir</button>
   </div>
@@ -68,16 +78,15 @@
     </div>
 
     <div class="op-right">
-      {{-- ========= PANEL EN PANTALLA (inputs) ========= --}}
       <div class="op-box no-print">
         <div class="op-grid">
           <div class="op-field">
-            <label>NÚMERO DE TRANSFERENCIA</label>
+            <label>BBL/INT/</label>
             <input type="text" id="inp-transferencia" value="{{ $op?->transferencia ?? '' }}" placeholder="BBL/INT/">
           </div>
 
           <div class="op-field">
-            <label>LOTE INTERNO PRODUCCIÓN</label>
+            <label>BBL/MO/</label>
             <input type="text" id="inp-lote-interno" value="{{ $op?->lote_interno ?? '' }}" placeholder="BBL/MO/">
           </div>
 
@@ -94,7 +103,6 @@
         </div>
       </div>
 
-      {{-- ========= PANEL PARA IMPRESIÓN (texto) ========= --}}
       <div class="op-box print-only">
         <table style="width:100%; border-collapse:collapse;">
           <tr>
@@ -125,30 +133,49 @@
     <p class="sub">{{ $f->codigo }} — {{ $f->nombre_etiqueta }}</p>
   </div>
 
-  {{-- Tabla ítems --}}
   <div class="block">
     <table>
       <thead>
         <tr>
-          <th style="width:90px;">Cod. Odoo</th>
+          <th style="width:90px;">Código</th>
           <th>Activo</th>
           <th class="right" style="width:110px;">Cantidad</th>
           <th style="width:70px;">Unidad</th>
           <th class="right" style="width:110px;">Masa G</th>
+          <th class="right" style="width:110px;">Unidades</th>
         </tr>
       </thead>
       <tbody>
         @foreach($items as $it)
-          @php $masaG = $it->masa_mes !== null ? (float)$it->masa_mes : 0.0; @endphp
+          @php
+            $masaG = $it->masa_mes !== null ? (float)$it->masa_mes : 0.0;
+
+            $u = strtolower((string)($it->unidad ?? ''));
+            $cod = (int)($it->cod_odoo ?? 0);
+
+            $esUnd = in_array($u, ['und','unidades'], true);
+            $undBase = $esUnd ? (float)($it->cantidad ?? 0) : 0.0;
+
+            // ✅ Como el pastillero se multiplica por lote, marcamos:
+            // - cápsulas (3392/3994/70274)
+            // - pastilleros (3394/3396) *si es que estuvieran visibles*
+            $multUnd = $esUnd && (in_array($cod, $CAPSULA_CODES, true) || in_array($cod, $PASTILLEROS, true));
+          @endphp
+
           <tr>
             <td>{{ $it->cod_odoo }}</td>
             <td>{{ $it->activo }}</td>
             <td class="right">{{ number_format((float)$it->cantidad, 2, '.', '') }}</td>
             <td>{{ $it->unidad }}</td>
 
-            {{-- ✅ solo esta columna cambia con lote --}}
             <td class="right masa-g" data-base="{{ number_format($masaG, 4, '.', '') }}">
               {{ number_format($masaG, 4, '.', '') }}
+            </td>
+
+            <td class="right und"
+                data-base="{{ number_format($undBase, 4, '.', '') }}"
+                data-mult="{{ $multUnd ? '1' : '0' }}">
+              {{ $esUnd ? number_format($undBase, 0, '.', '') : '' }}
             </td>
           </tr>
         @endforeach
@@ -189,12 +216,49 @@
     </table>
   </div>
 
+  {{-- PRESENTACIÓN --}}
+  <div class="block" style="margin-top: 10px;">
+    <table>
+      <tbody>
+        <tr>
+          <th style="width:260px;">PRESENTACIÓN</th>
+          <td class="right">
+            <span id="presentacion-val" data-base="{{ number_format($presentacionBase, 6, '.', '') }}">
+              {{ number_format($presentacionBase, 0, '.', '') }}
+            </span>
+          </td>
+          <td style="width:80px;">cápsulas</td>
+        </tr>
+
+        {{-- Muestro frascos para que quede claro el cálculo --}}
+        <tr>
+          <th>Frascos</th>
+          <td class="right">
+            <span id="frascos-val" data-base="{{ number_format($frascoBase, 6, '.', '') }}">
+              {{ number_format($frascoBase, 0, '.', '') }}
+            </span>
+          </td>
+          <td>und</td>
+        </tr>
+
+        <tr>
+          <th>Cápsulas por frasco</th>
+          <td class="right">
+            <span id="caps-frasco-val" data-base="{{ number_format($capsPorFrascoBase, 8, '.', '') }}">
+              {{ number_format($capsPorFrascoBase, 2, '.', '') }}
+            </span>
+          </td>
+          <td>caps/frasco</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <script>
   (function(){
     const csrf = '{{ csrf_token() }}';
     const opId = @json($op?->id ?? null);
 
-    // URLs
     const baseOP  = @json(url('/ordenes-produccion'));
     const urlLog  = opId ? `${baseOP}/${opId}/print-log` : null;
     const urlMeta = opId ? `${baseOP}/${opId}/meta` : null;
@@ -208,13 +272,18 @@
     const btnGuardar  = document.getElementById('btn-guardar-meta');
     const btnPrint    = document.getElementById('btn-print-now');
 
+    const presEl = document.getElementById('presentacion-val');
+    const frascosEl = document.getElementById('frascos-val');
+    const capsFrascoEl = document.getElementById('caps-frasco-val');
+
     function toNum(v){
       const n = parseFloat((v ?? '').toString().replace(',', '.'));
       return Number.isFinite(n) ? n : 0;
     }
-    function fmt4(n){
-      return (Math.round(n * 10000) / 10000).toFixed(4);
-    }
+    function fmt4(n){ return (Math.round(n * 10000) / 10000).toFixed(4); }
+    function fmt2(n){ return (Math.round(n * 100) / 100).toFixed(2); }
+    function fmt0(n){ return Math.round(n).toString(); }
+
     function getLote(){
       const v = Math.max(1, parseInt(inpLote?.value || '1', 10) || 1);
       if (inpLote) inpLote.value = v;
@@ -222,12 +291,24 @@
     }
 
     function aplicarLote(mult){
-      // ✅ solo cambia Masa G
-      document.querySelectorAll('td.masa-g').forEach(td => {
-        const base = toNum(td.dataset.base);
-        td.textContent = fmt4(base * mult);
-      });
-    }
+
+  // ✅ Solo cambia Masa G
+  document.querySelectorAll('td.masa-g').forEach(td => {
+    const base = toNum(td.dataset.base);
+    td.textContent = fmt4(base * mult);
+  });
+
+  // ✅ Solo cambia Unidades en tabla principal
+  document.querySelectorAll('td.und').forEach(td => {
+    if (td.dataset.mult !== '1') return;
+    const base = toNum(td.dataset.base);
+    td.textContent = fmt0(base * mult);
+  });
+
+  // ❌ NO tocar presentación
+  // ❌ NO tocar frascos
+  // ❌ NO tocar caps/frasco
+}
 
     function syncPrintFields(){
       const t  = document.getElementById('print-transferencia');
@@ -271,7 +352,6 @@
       return true;
     }
 
-    // eventos sync (para que al imprimir salga igual)
     inpTransfer?.addEventListener('input', syncPrintFields);
     inpLoteInt?.addEventListener('input', syncPrintFields);
     inpLote?.addEventListener('input', syncPrintFields);
@@ -298,7 +378,6 @@
       }
     });
 
-    // aplica lote inicial (si op trae lote)
     const loteInicial = getLote();
     aplicarLote(loteInicial);
     syncPrintFields();
@@ -312,7 +391,6 @@
       btnPrint.disabled = true;
 
       try {
-        // guarda meta + sincroniza texto impreso antes de imprimir
         await guardarMeta();
         syncPrintFields();
 

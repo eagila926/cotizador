@@ -20,19 +20,25 @@ class FormulasEstController extends Controller
 
     private const COD_CELULOSA = 3291;
 
-    // ✅ EXCLUSIÓN PARA IMPRESIÓN (etiqueta)
-    // (incluye lo que mencionaste: capsula/pastillero/auxiliares)
+    // Códigos negocio
+    private const CAPSULA_CODES = [3392, 3994, 70274]; // fallback real para "total caps"
+    private const PASTILLERO_CODES = [3396, 3394];     // ✅ frascos
+
+    // ✅ EXCLUSIÓN PARA IMPRESIÓN (etiqueta / items_print visual)
+    // Nota: NO excluyo capsulas aquí porque las quiero visibles en items_print.
     private const PRINT_EXCLUDE_CODES = [
         3740,3742,3744,3743,3739,
         1078,1077,1219,70276,70271,71497,
         3436,3435,3434,
-        3393,3395,3398,3396,3392,3394,3291
+
+        // Auxiliares
+        3393,3395,
+        3397,3398,      // ✅ tapa seguridad (3397) y (3398) fuera
+        3291,           // celulosa fuera de la tabla visual
+
+        // Pastilleros fuera de la tabla visual (pero se usan para cálculo)
+        3396,3394,
     ];
-
-    // Detección fallback cápsula (si luego lo necesitas)
-    private const CAPSULA_CODES_FALLBACK = [3392, 3994, 70274];
-
-    // =============== Helpers internos ===============
 
     private static function endCodes(): array
     {
@@ -49,6 +55,27 @@ class FormulasEstController extends Controller
         $excluir = self::printExcludeCodes();
         return $items
             ->reject(fn($it) => in_array((int)($it->cod_odoo ?? 0), $excluir, true))
+            ->values();
+    }
+
+    /**
+     * ✅ Para fe.items_print:
+     * - aplica exclusiones visuales (tapa/celulosa/pastillero/etc.)
+     * - PERO permite mostrar cápsula (3392/3994/70274) aunque se quisiera excluir
+     */
+    private static function filterForItemsPrint($items)
+    {
+        $excluir = self::printExcludeCodes();
+
+        return $items
+            ->reject(function($it) use ($excluir) {
+                $cod = (int)($it->cod_odoo ?? 0);
+
+                // ✅ Siempre permitir cápsulas para que se vean en tabla y en columna Unidades
+                if (in_array($cod, self::CAPSULA_CODES, true)) return false;
+
+                return in_array($cod, $excluir, true);
+            })
             ->values();
     }
 
@@ -129,39 +156,28 @@ class FormulasEstController extends Controller
 
     // =============== IMPRESIÓN etiqueta ===============
 
-    /**
-     * Etiqueta genérica (impresión)
-     * - Carga items por relación
-     * - Excluye PRINT_EXCLUDE_CODES
-     * - Retorna view etiquetas.generica
-     */
     public function print(Request $request, int $id)
     {
         $formula = Formula::with('items')->findOrFail($id);
 
-        // ✅ Base items: preferimos relación (ya la tienes)
         $itemsAll = $formula->items->values();
-
-        // ✅ Filtrado real para impresión
         $itemsPrint = self::filterForPrint($itemsAll);
 
         $qf = 'Q.F. Jose Perez';
 
         return view('etiquetas.generica', [
             'formula'           => $formula,
-            'items'             => $itemsPrint, // ✅ ya filtrados
+            'items'             => $itemsPrint,
             'qf'                => $qf,
             'fechaElaboracion'  => now()->format('d-m-Y'),
         ]);
     }
 
-    // =============== Vista items/resumen (lo mantengo) ===============
+    // =============== Vista items/resumen (pantalla) ===============
 
     public function items(int $id)
     {
         $f = Formula::findOrFail($id, ['id','codigo','nombre_etiqueta','tomas_diarias']);
-
-        $endCodes = self::endCodes();
 
         $items = FormulaItem::where('codigo', $f->codigo)
             ->orderByRaw('CASE WHEN cod_odoo = 3291 THEN 1 ELSE 0 END ASC')
@@ -189,9 +205,9 @@ class FormulasEstController extends Controller
 
         $capsMes = 0.0;
         $capsItem = $items->first(function($it){
-            $cod = (int)$it->cod_odoo;
+            $cod = (int)($it->cod_odoo ?? 0);
             $name = mb_strtolower((string)$it->activo);
-            return in_array($cod, self::CAPSULA_CODES_FALLBACK, true) || str_contains($name, 'capsul');
+            return in_array($cod, self::CAPSULA_CODES, true) || str_contains($name, 'capsul');
         });
         if ($capsItem) $capsMes = (float)($capsItem->cantidad ?? 0);
 
@@ -211,9 +227,6 @@ class FormulasEstController extends Controller
         ]);
     }
 
-    /**
-     * Actualiza celulosa (3291) en mg/día y recalcula masa_mes (g/mes)
-     */
     public function updateCelulosa(Request $request, int $id)
     {
         $data = $request->validate([
@@ -273,21 +286,14 @@ class FormulasEstController extends Controller
         $r = 2;
         foreach ($rows as $it) {
             $u = strtolower((string)$it->unidad);
-
             $esMasa = in_array($u, ['mg','mcg','ui','g','ufc'], true);
 
-            $cantidadExport = $esMasa
-                ? (float)($it->masa_mes ?? 0)
-                : (float)($it->cantidad ?? 0);
-
-            $unidadExport = $esMasa
-                ? 'g'
-                : (($u === 'und') ? 'Unidades' : ($it->unidad ?? ''));
+            $cantidadExport = $esMasa ? (float)($it->masa_mes ?? 0) : (float)($it->cantidad ?? 0);
+            $unidadExport = $esMasa ? 'g' : (($u === 'und') ? 'Unidades' : ($it->unidad ?? ''));
 
             $sheet->setCellValue("A{$r}", (int)$it->cod_odoo);
             $sheet->setCellValue("B{$r}", $cantidadExport);
             $sheet->setCellValue("C{$r}", $unidadExport);
-
             $sheet->getStyle("B{$r}")->getNumberFormat()->setFormatCode('0.0000');
             $r++;
         }
@@ -328,7 +334,12 @@ class FormulasEstController extends Controller
     }
 
     /**
-     * Si usas items_print aparte (otra plantilla), lo dejo intacto.
+     * ✅ Hoja de impresión (OP + tabla + resumen + presentación)
+     * Reglas:
+     * - Presentación = total cápsulas (códigos 3392/3994/70274)
+     * - Frascos = 3396 + 3394
+     * - Caps/frasco = caps / frascos
+     * - Con LOTE: cápsulas y frascos se multiplican => caps/frasco se mantiene (se recalcula visualmente)
      */
     public function itemsPrint(Request $request, int $id)
     {
@@ -341,17 +352,19 @@ class FormulasEstController extends Controller
             ->orderByDesc('id')
             ->get(['id','cod_odoo','activo','cantidad','unidad','masa_mes']);
 
-        $items = self::filterForPrint($itemsAll);
+        // ✅ filtro visual para items_print
+        $items = self::filterForItemsPrint($itemsAll);
 
         $tomasDia = (float)($f->tomas_diarias ?? 1);
         if ($tomasDia <= 0) $tomasDia = 1.0;
 
+        // Celulosa (aunque no se muestre en tabla)
         $cel = $itemsAll->firstWhere('cod_odoo', self::COD_CELULOSA);
         $celMgDia = $cel ? (float)($cel->cantidad ?? 0) : 0.0;
 
         $totalPrincipiosMgDia = 0.0;
         foreach ($itemsAll as $it) {
-            $cod = (int)$it->cod_odoo;
+            $cod = (int)($it->cod_odoo ?? 0);
             if ($cod === self::COD_CELULOSA) continue;
             if (!is_null($it->masa_mes)) {
                 $totalPrincipiosMgDia += (((float)$it->masa_mes) * 1000.0) / 30.0;
@@ -362,15 +375,37 @@ class FormulasEstController extends Controller
         $celPorCapsMg   = $celMgDia / $tomasDia;
         $contenidoCaps  = $dosisPorCapsMg + $celPorCapsMg;
 
+        // ===== PRESENTACIÓN BASE (sin lote) =====
+        $capsItem = $itemsAll->first(function($it){
+            $cod = (int)($it->cod_odoo ?? 0);
+            return in_array($cod, self::CAPSULA_CODES, true);
+        });
+        $totalCapsulas = $capsItem ? (float)($capsItem->cantidad ?? 0) : 0.0;
+
+        $numFrascos = 0.0;
+        foreach ($itemsAll as $it) {
+            $cod = (int)($it->cod_odoo ?? 0);
+            if (in_array($cod, self::PASTILLERO_CODES, true)) {
+                $numFrascos += (float)($it->cantidad ?? 0);
+            }
+        }
+        if ($numFrascos <= 0) $numFrascos = 1.0;
+
+        $capsPorFrasco = $totalCapsulas / $numFrascos;
+
         $resumen = [
             'total_principios_mg_dia' => $totalPrincipiosMgDia,
             'dosis_caps_mg'           => $dosisPorCapsMg,
             'celulosa_caps_mg'        => $celPorCapsMg,
             'contenido_caps_mg'       => $contenidoCaps,
             'dosificacion_caps_dia'   => $tomasDia,
+
+            // ✅ base para el blade (sin lote)
+            'presentacion_caps'       => $totalCapsulas,
+            'num_frascos'             => $numFrascos,
+            'caps_por_frasco'         => $capsPorFrasco,
         ];
 
-        // AQUÍ CARGAMOS LA OP
         $opId = (int) $request->query('op_id', 0);
         $op = $opId > 0 ? OrdenProduccion::find($opId) : null;
 
@@ -381,5 +416,4 @@ class FormulasEstController extends Controller
             'op'      => $op,
         ]);
     }
-
 }
